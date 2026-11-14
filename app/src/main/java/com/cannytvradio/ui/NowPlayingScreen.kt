@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cannytvradio.R
+import com.cannytvradio.data.primaryLocale
 import com.cannytvradio.RadioApp
 import com.cannytvradio.player.PlayerState
 import java.util.Date
@@ -87,7 +88,7 @@ fun NowPlayingScreen(app: RadioApp, ps: PlayerState, actions: Actions) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val language = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
+                val language = androidx.compose.ui.platform.LocalConfiguration.current.primaryLocale().language
                 val place = listOf(
                     com.cannytvradio.data.Regions.label(station.countryCode, station.state, language).orEmpty(),
                     countryName(station.countryCode, station.country),

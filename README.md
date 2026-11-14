@@ -25,9 +25,12 @@ Calm, ad-free internet radio for Android TV and Google TV.
 - Number keys 1–9 play your favorites; hold OK on one to move it
 - Even out volume across stations, plus an equalizer you can tune by ear
 - Sleep timer with a soft fade-out
+- Works with the remote, a keyboard, a mouse or touch
 - German and English
 
 ## Install
+
+One APK for every device: Android 5.0 or newer, any processor (ARM or x86). That covers Android TV and Google TV, Fire TV, TV boxes, tablets, phones and Chromebooks.
 
 The app isn't in the Play Store. Build it and install it with adb (JDK 17 and the Android SDK needed):
 

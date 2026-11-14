@@ -115,19 +115,29 @@ class PlayerController(
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        val cm = context.getSystemService(ConnectivityManager::class.java)
-        cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val onNetwork = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 scope.launch {
                     val s = _state.value
                     if (s.station != null && (s.failed || (player.playWhenReady && !player.isPlaying))) restart()
                 }
             }
-        })
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            cm.registerDefaultNetworkCallback(onNetwork)
+        } else {
+            val request = android.net.NetworkRequest.Builder()
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+            cm.registerNetworkCallback(request, onNetwork)
+        }
     }
 
     fun play(station: Station) {
         backupJob?.cancel()
+        fadeJob?.cancel()
+        fadeInWhenPlaying = false
+        player.volume = 1f
         rounds = 0
         _state.value = PlayerState(station = station, buffering = true, sleepAt = _state.value.sleepAt)
         repo.addRecent(station)
@@ -159,16 +169,53 @@ class PlayerController(
         }
     }
 
-    /** Play/pause. Resuming a live stream reconnects, so you hear "now" and not old buffer. */
+    /** Play/pause, the same for the remote, headphones, Bluetooth, Google TV and the screen. */
     fun toggle() {
-        if (player.isPlaying || (player.playWhenReady && _state.value.buffering)) player.pause() else resume()
+        if (player.playWhenReady) pause() else resume()
     }
 
+    /** Fades out over 0.2 s, then pauses. */
+    fun pause() {
+        if (!player.playWhenReady) return
+        pausedAt = System.currentTimeMillis()
+        fadeJob?.cancel()
+        fadeJob = scope.launch {
+            fadeVolume(0f, FADE_PAUSE_MS)
+            player.pause()
+        }
+    }
+
+    /**
+     * After a short pause the buffered audio simply continues; after a longer one the stream
+     * reconnects, so you hear what is on air now. Either way the sound fades in.
+     */
     fun resume() {
         if (_state.value.station == null) return
+        fadeJob?.cancel()
         rounds = 0
         if (streams.isEmpty()) _state.value.station?.let { play(it); return }
-        start()
+        player.volume = 0f
+        val shortPause = System.currentTimeMillis() - pausedAt < QUICK_RESUME_MS
+        if (shortPause && player.playbackState == Player.STATE_READY) {
+            player.play()
+            fadeJob = scope.launch { fadeVolume(1f, FADE_IN_MS) }
+        } else {
+            fadeInWhenPlaying = true
+            start()
+        }
+    }
+
+    private var pausedAt = 0L
+    private var fadeJob: Job? = null
+    private var fadeInWhenPlaying = false
+
+    private suspend fun fadeVolume(target: Float, ms: Long) {
+        val from = player.volume
+        val steps = 12
+        for (i in 1..steps) {
+            player.volume = from + (target - from) * i / steps
+            delay(ms / steps)
+        }
     }
 
     /** Next or previous favorite, like the channel buttons on a radio. */
@@ -295,7 +342,13 @@ class PlayerController(
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _state.update { it.copy(playing = isPlaying) }
-            if (isPlaying) rounds = 0
+            if (isPlaying) {
+                rounds = 0
+                if (fadeInWhenPlaying || player.volume < 1f && fadeJob?.isActive != true && sleepJob?.isActive != true) {
+                    fadeInWhenPlaying = false
+                    fadeJob = scope.launch { fadeVolume(1f, FADE_IN_MS) }
+                }
+            }
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -362,5 +415,8 @@ class PlayerController(
         const val STALL_MS = 15_000L
         const val MAX_ROUNDS = 3
         const val MAX_SONGS = 20
+        const val FADE_PAUSE_MS = 200L
+        const val FADE_IN_MS = 400L
+        const val QUICK_RESUME_MS = 20_000L
     }
 }

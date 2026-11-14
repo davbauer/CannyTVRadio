@@ -75,6 +75,7 @@ import kotlinx.coroutines.launch
 import com.cannytvradio.R
 import com.cannytvradio.RadioApp
 import com.cannytvradio.data.Station
+import com.cannytvradio.data.primaryLocale
 import com.cannytvradio.player.PlayerState
 
 /** Five-column station grid; `null` shows placeholders in the same size. */
@@ -262,7 +263,7 @@ fun RegionsScreen(app: RadioApp, ps: PlayerState, actions: Actions) {
     val stations by model.regionStations.collectAsState()
     val favorites = rememberFavoriteIds(app)
     LaunchedEffect(Unit) { model.openRegions() }
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.primaryLocale()
 
     // Home country first, then the biggest ones, named in the TV's language.
     val ordered = remember(countries, prefs.home) {

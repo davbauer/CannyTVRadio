@@ -32,7 +32,11 @@ class PlaybackService : MediaSessionService() {
                 super.getAvailableCommands().buildUpon().addAll(*extra.toIntArray()).build()
 
             override fun isCommandAvailable(command: Int) = command in extra || super.isCommandAvailable(command)
+            // Every play/pause from outside the app (headphones, Bluetooth, Google TV, notifications)
+            // goes through the same fades and resume logic as the remote.
             override fun play() = controller.resume()
+            override fun pause() = controller.pause()
+            override fun setPlayWhenReady(playWhenReady: Boolean) = if (playWhenReady) controller.resume() else controller.pause()
             override fun seekToNext() = controller.skip(1)
             override fun seekToNextMediaItem() = controller.skip(1)
             override fun seekToPrevious() = controller.skip(-1)

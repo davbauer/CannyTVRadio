@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.cannytvradio.player.PlaybackService
 import com.cannytvradio.ui.RadioRoot
+import com.cannytvradio.data.primaryLocale
 import com.cannytvradio.ui.Motion
 import com.cannytvradio.ui.RadioTheme
 import com.cannytvradio.ui.Tab
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
     /** Picks the highest refresh rate the TV offers at its current resolution (60, 120, 144 Hz). */
     private fun useFastestDisplayMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else @Suppress("DEPRECATION") windowManager.defaultDisplay
         display ?: return
         val current = display.mode
@@ -61,7 +63,7 @@ class MainActivity : ComponentActivity() {
     /** A language switch is applied in place: no restart, the current screen and focus stay. */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        newConfig.locales[0]?.let { java.util.Locale.setDefault(it) }
+        java.util.Locale.setDefault(newConfig.primaryLocale())
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -110,7 +112,7 @@ class MainActivity : ComponentActivity() {
                     player.skip(-1)
                     return true
                 }
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> {
                     player.toggle()
                     return true
                 }
@@ -119,7 +121,7 @@ class MainActivity : ComponentActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> {
-                    player.player.pause()
+                    player.pause()
                     return true
                 }
             }

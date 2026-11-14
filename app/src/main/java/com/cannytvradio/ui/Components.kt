@@ -77,6 +77,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +87,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cannytvradio.data.Station
+import com.cannytvradio.data.primaryLocale
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -167,6 +170,7 @@ private class Press {
 
 /**
  * Makes something focusable with the remote: OK clicks, holding OK long-clicks.
+ * Tap and press-and-hold do the same with touch or a mouse.
  * Only a press that started here counts, so the OK that opened a screen can't click on it.
  */
 @Composable
@@ -177,8 +181,17 @@ fun Modifier.dpad(
     onFocusChange: (Boolean) -> Unit = {},
 ): Modifier {
     val press = remember { Press() }
+    val click = androidx.compose.runtime.rememberUpdatedState(onClick)
+    val longClick = androidx.compose.runtime.rememberUpdatedState(onLongClick)
     return this
         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        // Touch and mouse too (tablets, phones, Chromebooks): tap clicks, press and hold long-clicks.
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onTap = { click.value() },
+                onLongPress = { longClick.value?.invoke() },
+            )
+        }
         .onFocusChanged { onFocusChange(it.isFocused) }
         .onKeyEvent { e ->
             if (e.key != Key.DirectionCenter && e.key != Key.Enter && e.key != Key.NumPadEnter) return@onKeyEvent false
@@ -302,7 +315,7 @@ private fun initials(name: String): String {
 /** Country name in the app's current language (follows a language switch right away). */
 @Composable
 fun countryName(code: String, fallback: String = ""): String {
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.primaryLocale()
     if (code.length != 2) return fallback
     // Looking names up in ICU is slow; every name is looked up once per language.
     return COUNTRY_NAMES.getOrPut("$code|${locale.language}") { Locale("", code).getDisplayCountry(locale) }.ifBlank { fallback }
@@ -313,7 +326,7 @@ private val COUNTRY_NAMES = java.util.concurrent.ConcurrentHashMap<String, Strin
 /** Where the station is from: its region (clean, in the app's language), or else the country. */
 @Composable
 fun Station.metaLine(): String {
-    val language = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
+    val language = androidx.compose.ui.platform.LocalConfiguration.current.primaryLocale().language
     return com.cannytvradio.data.Regions.label(countryCode, state, language) ?: countryName(countryCode, country)
 }
 

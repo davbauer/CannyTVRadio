@@ -32,7 +32,7 @@ data class Prefs(
 ) {
     val home: String
         get() = homeCountry.ifEmpty {
-            Resources.getSystem().configuration.locales[0].country.ifEmpty { "DE" }
+            Resources.getSystem().configuration.primaryLocale().country.ifEmpty { "DE" }
         }
 }
 
@@ -81,3 +81,7 @@ class Settings(private val sp: SharedPreferences) {
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
         name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default
 }
+
+/** The configuration's main language on every Android version (locales[0] needs Android 7). */
+fun android.content.res.Configuration.primaryLocale(): java.util.Locale =
+    androidx.core.os.ConfigurationCompat.getLocales(this)[0] ?: java.util.Locale.getDefault()
