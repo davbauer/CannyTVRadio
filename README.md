@@ -21,7 +21,7 @@ A calm, ad-free internet radio app for Android TV and Google TV. Built for the r
 
 **Sound**
 - Volume leveling, so every station plays equally loud.
-- A 5-band equalizer with 12 presets (Neutral, Bass, Club, Voice, Pop, Rock, Jazz, Classical, Warm, Bright, Loudness, Night).
+- A 5-band equalizer with 12 presets (Neutral, Bass, Club, Voice, Pop, Rock, Jazz, Classical, Warm, Bright, Loudness, Night) and three custom profiles: pick up a band with OK, set it with up and down, and hear the change right away.
 - Both run inside the app's own audio pipeline, so they sound the same on every TV.
 
 **Screen**

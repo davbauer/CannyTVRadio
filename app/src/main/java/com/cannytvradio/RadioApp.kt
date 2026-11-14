@@ -40,7 +40,7 @@ class RadioApp : Application(), ImageLoaderFactory {
         scope.launch {
             settings.prefs.collect {
                 player.sound.normalize = it.normalize
-                player.sound.preset = it.eq
+                player.sound.gains = com.cannytvradio.player.Eq.gains(it.eq, it.customs)
             }
         }
     }

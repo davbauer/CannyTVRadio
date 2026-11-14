@@ -34,6 +34,21 @@ enum class EqPreset(val gains: FloatArray) {
     Night(floatArrayOf(-9f, -3f, 2f, 3f, -4f)),
 }
 
+/** Band frequencies of the equalizer, for labels. */
+val EQ_BANDS = listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz")
+
+/** Equalizer choices: the presets plus three profiles of your own. */
+object Eq {
+    val CUSTOM = listOf("Custom1", "Custom2", "Custom3")
+    val ALL: List<String> = EqPreset.entries.map { it.name } + CUSTOM
+    const val RANGE = 12
+
+    fun gains(id: String, customs: List<List<Int>>): FloatArray =
+        EqPreset.entries.firstOrNull { it.name == id }?.gains
+            ?: CUSTOM.indexOf(id).takeIf { it >= 0 }?.let { i -> customs.getOrNull(i)?.map { it.toFloat() }?.toFloatArray() }
+            ?: EqPreset.Flat.gains
+}
+
 /**
  * The app's own sound processing, the same on every TV:
  * a 5-band equalizer, then volume leveling so every station plays equally loud.
@@ -50,9 +65,10 @@ class SoundProcessor : BaseAudioProcessor() {
             field = value
         }
 
-    @Volatile var preset = EqPreset.Flat
+    /** Gain in dB per band ([EQ_BANDS]); applied from the next audio block on. */
+    @Volatile var gains: FloatArray = EqPreset.Flat.gains
         set(value) {
-            if (field != value) android.util.Log.i("CannyTVRadio", "sound: equalizer $value")
+            if (!field.contentEquals(value)) android.util.Log.i("CannyTVRadio", "sound: equalizer ${value.joinToString()}")
             field = value
             dirty = true
         }
@@ -85,7 +101,7 @@ class SoundProcessor : BaseAudioProcessor() {
     override fun queueInput(input: ByteBuffer) {
         if (dirty) {
             rebuild()
-            android.util.Log.i("CannyTVRadio", "sound: applied ${preset.name}")
+            android.util.Log.i("CannyTVRadio", "sound: applied ${gains.joinToString()}")
         }
         val size = input.remaining()
         val out = replaceOutputBuffer(size)
@@ -128,7 +144,7 @@ class SoundProcessor : BaseAudioProcessor() {
 
     private fun rebuild() {
         dirty = false
-        val g = preset.gains
+        val g = gains
         // Lower the input by part of the biggest boost so boosted bands don't clip.
         preamp = 10f.pow(-max(0f, g.max()) * 0.6f / 20f)
         bands = Array(channels) {

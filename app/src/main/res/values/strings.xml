@@ -123,4 +123,7 @@
     <string name="eq_warm">Warm</string>
     <string name="eq_bright">Bright</string>
     <string name="eq_loudness">Loudness</string>
+    <string name="eq_custom">Custom %1$d</string>
+    <string name="s_eq_edit_desc">OK on a band picks it up, up and down change it, OK lets go.</string>
+    <string name="s_eq_reset">Reset to neutral</string>
 </resources>

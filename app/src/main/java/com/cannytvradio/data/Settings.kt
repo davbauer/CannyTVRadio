@@ -22,7 +22,10 @@ data class Prefs(
     val streamOrder: StreamOrder = StreamOrder.Quality,
     /** Bring every station to the same loudness. */
     val normalize: Boolean = true,
-    val eq: EqPreset = EqPreset.Flat,
+    /** A preset name or "Custom1".."Custom3" ([com.cannytvradio.player.Eq]). */
+    val eq: String = EqPreset.Flat.name,
+    /** The three custom profiles, dB per band. */
+    val customs: List<List<Int>> = List(3) { List(5) { 0 } },
     /** ISO country code; empty means "follow the TV". */
     val homeCountry: String = "",
 ) {
@@ -46,7 +49,8 @@ class Settings(private val sp: SharedPreferences) {
             .putBoolean("resumeOnStart", next.resumeOnStart)
             .putString("streamOrder", next.streamOrder.name)
             .putBoolean("normalize", next.normalize)
-            .putString("eq", next.eq.name)
+            .putString("eq", next.eq)
+            .putString("customs", next.customs.joinToString(";") { it.joinToString(",") })
             .putString("homeCountry", next.homeCountry)
             .apply()
     }
@@ -58,9 +62,15 @@ class Settings(private val sp: SharedPreferences) {
         resumeOnStart = sp.getBoolean("resumeOnStart", true),
         streamOrder = enumOr(sp.getString("streamOrder", null), StreamOrder.Quality),
         normalize = sp.getBoolean("normalize", true),
-        eq = enumOr(sp.getString("eq", null), EqPreset.Flat),
+        eq = sp.getString("eq", null)?.takeIf { it in com.cannytvradio.player.Eq.ALL } ?: EqPreset.Flat.name,
+        customs = parseCustoms(sp.getString("customs", null)),
         homeCountry = sp.getString("homeCountry", "") ?: "",
     )
+
+    private fun parseCustoms(text: String?): List<List<Int>> {
+        val parsed = text?.split(";")?.map { p -> p.split(",").mapNotNull { it.toIntOrNull() } }.orEmpty()
+        return List(3) { i -> parsed.getOrNull(i)?.takeIf { it.size == 5 } ?: List(5) { 0 } }
+    }
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
         name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default

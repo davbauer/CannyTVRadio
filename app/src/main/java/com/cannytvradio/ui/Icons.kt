@@ -43,6 +43,8 @@ object Ico {
         "M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88z",
     )
     val Move = line("M5 9l-3 3l3 3", "M9 5l3-3l3 3", "M15 19l-3 3l-3-3", "M19 9l3 3l-3 3", "M2 12h20", "M12 2v20")
+    val ChevronUp = line("M18 15l-6-6l-6 6")
+    val ChevronDown = line("M6 9l6 6l6-6")
     val ChevronLeft = line("M15 18l-6-6l6-6")
     val ChevronRight = line("M9 18l6-6l-6-6")
     val Trending = line("M22 7l-8.5 8.5l-5-5L2 17", "M16 7h6v6")
