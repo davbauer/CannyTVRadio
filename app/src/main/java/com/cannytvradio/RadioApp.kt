@@ -26,6 +26,8 @@ class RadioApp : Application(), ImageLoaderFactory {
         private set
     lateinit var browse: BrowseModel
         private set
+    lateinit var updater: com.cannytvradio.data.Updater
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -37,6 +39,8 @@ class RadioApp : Application(), ImageLoaderFactory {
         applyPendingImport()
         player = PlayerController(this, repo, scope)
         browse = BrowseModel(repo, settings, scope)
+        updater = com.cannytvradio.data.Updater(this, http, scope)
+        updater.check()
         scope.launch {
             settings.prefs.collect {
                 player.sound.normalize = it.normalize

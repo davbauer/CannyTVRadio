@@ -61,6 +61,7 @@ import com.cannytvradio.R
 import com.cannytvradio.RadioApp
 import com.cannytvradio.data.DimStyle
 import com.cannytvradio.data.Prefs
+import com.cannytvradio.data.UpdateState
 import com.cannytvradio.data.StreamOrder
 import com.cannytvradio.player.EQ_BANDS
 import com.cannytvradio.player.Eq
@@ -69,6 +70,7 @@ import com.cannytvradio.player.EqPreset
 @Composable
 fun SettingsScreen(app: RadioApp, actions: Actions) {
     val prefs by app.settings.prefs.collectAsState()
+    val updateState by app.updater.state.collectAsState()
     val context = LocalContext.current
     val ui = LocalUi.current
     val res = context.resources
@@ -92,6 +94,32 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
         contentPadding = PaddingValues(start = EDGE, end = EDGE + 40.dp, top = 6.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val update = updateState
+        update.available?.let { info ->
+            item { Section(stringResource(R.string.s_section_update)) }
+            item {
+                Group {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+                        Text(stringResource(R.string.update_available, info.versionName), color = Glass.text, style = MaterialTheme.typography.titleMedium)
+                        info.changes.take(6).forEach { change ->
+                            Text("•  $change", color = Glass.textDim, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    val status = when (update.step) {
+                        UpdateState.Step.Downloading -> stringResource(R.string.update_downloading, (update.progress * 100).toInt())
+                        UpdateState.Step.Verifying -> stringResource(R.string.update_verifying)
+                        UpdateState.Step.NeedsPermission -> stringResource(R.string.update_allow)
+                        UpdateState.Step.Installing -> stringResource(R.string.update_installing)
+                        UpdateState.Step.Failed -> stringResource(R.string.update_failed)
+                        UpdateState.Step.Idle -> null
+                    }
+                    Action(stringResource(R.string.update_install), status, "") {
+                        (context as? android.app.Activity)?.let(app.updater::install)
+                    }
+                }
+            }
+        }
+
         item { Section(stringResource(R.string.s_section_screen)) }
         item {
             Group {
@@ -208,6 +236,17 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                     ).joinToString("\n"),
                     stringResource(if (testing) R.string.checking else R.string.s_test),
                 ) { if (!testing) checks++ }
+                Action(
+                    stringResource(R.string.s_updates),
+                    when {
+                        updateState.checking -> stringResource(R.string.checking)
+                        updateState.available != null -> stringResource(R.string.update_available, updateState.available!!.versionName)
+                        updateState.lastCheckOk == true -> stringResource(R.string.update_current)
+                        updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed)
+                        else -> null
+                    },
+                    stringResource(R.string.s_check_updates),
+                ) { app.updater.check(force = true) }
                 Action(stringResource(R.string.s_clear_cache), null, "") {
                     app.repo.clearCache()
                     actions.toast(context.getString(R.string.cache_cleared))

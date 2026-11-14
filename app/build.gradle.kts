@@ -12,8 +12,22 @@ android {
         applicationId = "com.cannytvradio"
         minSdk = 21
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
+    }
+
+    // Release key lives outside the repo (see ~/.gradle/gradle.properties). Without it, builds fall
+    // back to the local debug key, which is fine for trying the app but can't update a release install.
+    val releaseStore = providers.gradleProperty("CANNY_STORE_FILE").orNull
+    signingConfigs {
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = file(releaseStore)
+                storePassword = providers.gradleProperty("CANNY_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("CANNY_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("CANNY_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
@@ -21,8 +35,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Sideloaded onto one TV, so the local debug key is enough.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

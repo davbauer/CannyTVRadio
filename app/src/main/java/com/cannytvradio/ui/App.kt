@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -382,16 +383,23 @@ private fun TopBar(app: RadioApp, ui: Ui) {
         }
         Clock()
         Spacer(Modifier.width(10.dp))
-        Box(Modifier.glass(RoundedCornerShape(50), tint = 0.45f).padding(5.dp)) {
-            Pill(
-                "",
-                selected = ui.tab == Tab.Settings,
-                onClick = { ui.tab = Tab.Settings },
-                onFocus = { ui.tab = Tab.Settings },
-                focusRequester = requesters.getValue(Tab.Settings),
-                icon = Ico.Sliders,
-                height = 40.dp,
-            )
+        val update by app.updater.state.collectAsState()
+        Box {
+            Box(Modifier.glass(RoundedCornerShape(50), tint = 0.45f).padding(5.dp)) {
+                Pill(
+                    "",
+                    selected = ui.tab == Tab.Settings,
+                    onClick = { ui.tab = Tab.Settings },
+                    onFocus = { ui.tab = Tab.Settings },
+                    focusRequester = requesters.getValue(Tab.Settings),
+                    icon = Ico.Sliders,
+                    height = 40.dp,
+                )
+            }
+            // A new version is waiting in the settings.
+            if (update.available != null) {
+                Box(Modifier.align(Alignment.TopEnd).padding(2.dp).size(11.dp).clip(CircleShape).background(Color(0xFF6FE3A0)))
+            }
         }
     }
 }

@@ -133,6 +133,12 @@ class MainActivity : ComponentActivity() {
         val DPAD = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
     }
 
+    override fun onResume() {
+        super.onResume()
+        app.updater.resumeAfterPermission(this)
+        app.updater.check()
+    }
+
     override fun onStop() {
         super.onStop()
         app.writeExport()

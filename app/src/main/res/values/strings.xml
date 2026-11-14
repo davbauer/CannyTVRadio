@@ -127,4 +127,16 @@
     <string name="style_time">Time</string>
     <string name="style_time_info">Time and info</string>
     <string name="style_nothing">Nothing</string>
+    <string name="s_section_update">Update</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_install">Install update</string>
+    <string name="update_downloading">Downloading, %1$d %%</string>
+    <string name="update_verifying">Checking the download</string>
+    <string name="update_allow">Allow CannyTVRadio to install apps, then come back here.</string>
+    <string name="update_installing">Android is installing the update.</string>
+    <string name="update_failed">The update couldn\'t be downloaded or verified. Nothing was installed.</string>
+    <string name="s_updates">Updates</string>
+    <string name="s_check_updates">Check now</string>
+    <string name="update_current">You have the newest version.</string>
+    <string name="update_check_failed">Couldn\'t check right now.</string>
 </resources>
