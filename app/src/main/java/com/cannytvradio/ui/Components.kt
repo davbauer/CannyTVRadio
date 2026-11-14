@@ -773,3 +773,25 @@ fun androidx.compose.foundation.lazy.grid.LazyGridState.progress(): Pair<Float, 
     val range = (total - viewport).coerceAtLeast(1f)
     return (scrolled / range).coerceIn(0f, 1f) to (viewport / total).coerceIn(0.08f, 1f)
 }
+
+/**
+ * Softly fades the left and right edge of a horizontal list, so a chip that is only partly
+ * on screen looks intentional instead of cut off.
+ */
+fun Modifier.fadeEdges(width: Dp = 36.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val w = width.toPx()
+        drawRect(
+            Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = w),
+            size = Size(w, size.height),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+        drawRect(
+            Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
+            topLeft = Offset(size.width - w, 0f),
+            size = Size(w, size.height),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }

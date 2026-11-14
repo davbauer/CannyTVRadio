@@ -12,8 +12,8 @@ android {
         applicationId = "com.cannytvradio"
         minSdk = 21
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.2.1"
     }
 
     // Release key lives outside the repo (see ~/.gradle/gradle.properties). Without it, builds fall
@@ -72,4 +72,6 @@ dependencies {
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for unit tests (Android's copy only exists on devices).
+    testImplementation("org.json:json:20240303")
 }

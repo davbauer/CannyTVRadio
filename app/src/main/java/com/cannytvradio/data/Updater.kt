@@ -65,7 +65,8 @@ class Updater(private val context: Context, private val http: Http, private val 
         _state.update { it.copy(checking = true) }
         scope.launch {
             val info = try {
-                parse(http.get(FEED))
+                val language = if (java.util.Locale.getDefault().language == "de") "de" else "en"
+                UpdateFeed.parse(http.get(FEED), Build.VERSION.SDK_INT, Build.SUPPORTED_ABIS.toList(), language)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -73,7 +74,7 @@ class Updater(private val context: Context, private val http: Http, private val 
                 return@launch
             }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
-            _state.update { it.copy(checking = false, lastCheckOk = true, available = info?.takeIf { i -> i.versionCode > BuildConfig.VERSION_CODE }) }
+            _state.update { it.copy(checking = false, lastCheckOk = true, available = info?.takeIf { i -> UpdateFeed.isNewer(i, BuildConfig.VERSION_CODE) }) }
         }
     }
 
@@ -102,7 +103,7 @@ class Updater(private val context: Context, private val http: Http, private val 
                 return@launch
             }
             _state.update { it.copy(step = UpdateState.Step.Verifying) }
-            val trusted = withContext(Dispatchers.IO) { sha256(file) == info.sha256.lowercase() && signedByUs(file) }
+            val trusted = withContext(Dispatchers.IO) { UpdateFeed.sha256(file) == info.sha256.lowercase() && signedByUs(file) }
             if (!trusted) {
                 android.util.Log.w("CannyTVRadio", "update: rejected, checksum or signature does not match")
                 file.delete()
@@ -171,50 +172,59 @@ class Updater(private val context: Context, private val http: Http, private val 
         return certs.any { digest(it.toByteArray()) == RELEASE_CERT_SHA256 }
     }
 
-    private fun parse(body: String): UpdateInfo? {
+    private fun digest(bytes: ByteArray) =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    companion object {
+        const val FEED = "${UpdateFeed.REPO}/releases/latest/download/update.json"
+        /** SHA-256 of the CannyTVRadio release signing certificate. */
+        private const val RELEASE_CERT_SHA256 = "ffbe18d85267d7c1a98ddb41175faeec3d9cc38f3086e160b8c833ab4c848001"
+        private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
+    }
+}
+
+/** Reading update.json and checking downloads; no Android dependencies, so it is unit-tested. */
+object UpdateFeed {
+    const val REPO = "https://github.com/davbauer/CannyTVRadio"
+    /** Downloads are only trusted from this project's own GitHub releases. */
+    const val TRUSTED_PREFIX = "$REPO/releases/download/"
+
+    /** The download that fits this device, or null if none fits or none is trusted. */
+    fun parse(body: String, sdkInt: Int, abis: List<String>, language: String): UpdateInfo? {
         val o = JSONObject(body)
-        val language = if (java.util.Locale.getDefault().language == "de") "de" else "en"
         val changes = o.optJSONObject("changes")?.let { c -> (c.optJSONArray(language) ?: c.optJSONArray("en")).strings() }.orEmpty()
-        val abis = Build.SUPPORTED_ABIS.toSet()
         val downloads = o.optJSONArray("downloads") ?: return null
         val pick = (0 until downloads.length()).map { downloads.getJSONObject(it) }
-            .filter { it.optInt("minSdk", 21) <= Build.VERSION.SDK_INT }
+            .filter { it.optInt("minSdk", 21) <= sdkInt }
             .filter { d -> d.optJSONArray("abis").strings().let { it.isEmpty() || it.any(abis::contains) } }
-            // A download is only trusted from this project's own GitHub releases.
-            .firstOrNull { it.optString("url").startsWith(TRUSTED_PREFIX) }
+            .firstOrNull { isTrusted(it.optString("url")) }
             ?: return null
         return UpdateInfo(
             versionCode = o.getInt("versionCode"),
             versionName = o.optString("versionName"),
             changes = changes,
             url = pick.getString("url"),
-            sha256 = pick.getString("sha256"),
+            sha256 = pick.getString("sha256").lowercase(),
             size = pick.optLong("size"),
         )
     }
 
-    private fun sha256(file: File): String {
+    /** Only https downloads of this repository's releases; no other host, no path tricks. */
+    fun isTrusted(url: String): Boolean =
+        url.startsWith(TRUSTED_PREFIX) && ".." !in url && "?" !in url && "#" !in url && "@" !in url
+
+    fun isNewer(info: UpdateInfo, installedCode: Int) = info.versionCode > installedCode
+
+    fun sha256(file: File): String = file.inputStream().use { sha256(it) }
+
+    fun sha256(input: java.io.InputStream): String {
         val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buffer)
-                if (n < 0) break
-                md.update(buffer, 0, n)
-            }
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) break
+            md.update(buffer, 0, n)
         }
         return md.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun digest(bytes: ByteArray) =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-
-    companion object {
-        private const val REPO = "https://github.com/davbauer/CannyTVRadio"
-        const val FEED = "$REPO/releases/latest/download/update.json"
-        private const val TRUSTED_PREFIX = "$REPO/releases/download/"
-        /** SHA-256 of the CannyTVRadio release signing certificate. */
-        private const val RELEASE_CERT_SHA256 = "ffbe18d85267d7c1a98ddb41175faeec3d9cc38f3086e160b8c833ab4c848001"
-        private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
     }
 }

@@ -272,7 +272,7 @@ fun RegionsScreen(app: RadioApp, ps: PlayerState, actions: Actions) {
 
     Column(Modifier.fillMaxSize()) {
         LazyRow(
-            Modifier.height(58.dp),
+            Modifier.height(58.dp).fadeEdges(),
             contentPadding = PaddingValues(horizontal = EDGE, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -291,7 +291,7 @@ fun RegionsScreen(app: RadioApp, ps: PlayerState, actions: Actions) {
         }
         // Always the same height, so the grid doesn't jump when regions arrive.
         LazyRow(
-            Modifier.height(58.dp),
+            Modifier.height(58.dp).fadeEdges(),
             contentPadding = PaddingValues(horizontal = EDGE, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {

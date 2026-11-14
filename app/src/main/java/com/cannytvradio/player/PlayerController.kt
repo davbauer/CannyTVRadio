@@ -297,13 +297,19 @@ class PlayerController(
     /** Moves to the next stream; after the last one, fetches fresh streams and starts over (3 rounds). */
     private fun next() {
         stallJob?.cancel()
+        android.util.Log.i("CannyTVRadio", "stream: ${index + 1}/${streams.size} failed (${streams.getOrNull(index)})")
         if (index + 1 < streams.size) {
             index++
+            android.util.Log.i("CannyTVRadio", "stream: switching to ${index + 1}/${streams.size}")
             start()
             return
         }
         rounds++
-        if (rounds > MAX_ROUNDS) return fail()
+        if (rounds > MAX_ROUNDS) {
+            android.util.Log.i("CannyTVRadio", "stream: all streams failed $MAX_ROUNDS times, giving up")
+            return fail()
+        }
+        android.util.Log.i("CannyTVRadio", "stream: all ${streams.size} failed, fetching fresh streams (round $rounds)")
         _state.update { it.copy(buffering = true) }
         scope.launch {
             delay(2_000L * rounds)
