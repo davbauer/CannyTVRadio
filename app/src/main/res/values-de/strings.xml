@@ -83,8 +83,6 @@
     <string name="source_ti_ok">TuneIn: erreichbar</string>
     <string name="source_ti_down">TuneIn: nicht erreichbar</string>
     <string name="source_ti_unknown">TuneIn: noch nicht geprüft</string>
-    <string name="s_clear_cache">Gespeicherte Listen löschen</string>
-    <string name="cache_cleared">Gespeicherte Listen gelöscht</string>
     <string name="s_version">Version %1$s</string>
     <string name="offline_short">Offline · gespeicherte Listen</string>
     <string name="nothing_playing">Gerade läuft nichts</string>
@@ -144,4 +142,7 @@
     <string name="update_versions">Installiert: %1$s · Neu: %2$s</string>
     <string name="update_installed">Installiert: %1$s</string>
     <string name="s_install_now">Installieren</string>
+    <string name="s_reload_lists">Senderlisten neu laden</string>
+    <string name="s_reload_lists_desc">Lädt Start, Suche und Regionen frisch aus dem Senderverzeichnis. Favoriten und Einstellungen bleiben.</string>
+    <string name="lists_reloading">Senderlisten werden neu geladen</string>
 </resources>

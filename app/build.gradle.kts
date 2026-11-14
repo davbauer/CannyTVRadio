@@ -12,8 +12,8 @@ android {
         applicationId = "com.cannytvradio"
         minSdk = 21
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.2.4"
+        versionCode = 8
+        versionName = "1.2.5"
     }
 
     // Release key lives outside the repo (see ~/.gradle/gradle.properties). Without it, builds fall

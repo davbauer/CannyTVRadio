@@ -87,8 +87,6 @@
     <string name="source_ti_ok">TuneIn: reachable</string>
     <string name="source_ti_down">TuneIn: not reachable</string>
     <string name="source_ti_unknown">TuneIn: not checked yet</string>
-    <string name="s_clear_cache">Clear saved lists</string>
-    <string name="cache_cleared">Saved lists cleared</string>
     <string name="s_version">Version %1$s</string>
     <string name="offline_short">Offline · saved lists</string>
     <string name="nothing_playing">Nothing playing</string>
@@ -148,4 +146,7 @@
     <string name="update_versions">Installed: %1$s · New: %2$s</string>
     <string name="update_installed">Installed: %1$s</string>
     <string name="s_install_now">Install</string>
+    <string name="s_reload_lists">Reload station lists</string>
+    <string name="s_reload_lists_desc">Fetches Home, Search and Regions fresh from the station directory. Favorites and settings stay.</string>
+    <string name="lists_reloading">Station lists are being reloaded</string>
 </resources>

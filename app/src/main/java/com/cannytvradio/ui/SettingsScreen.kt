@@ -256,9 +256,9 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                     if (updateState.available != null) (context as? android.app.Activity)?.let(app.updater::install)
                     else app.updater.check(force = true)
                 }
-                Action(stringResource(R.string.s_clear_cache), null, "") {
-                    app.repo.clearCache()
-                    actions.toast(context.getString(R.string.cache_cleared))
+                Action(stringResource(R.string.s_reload_lists), stringResource(R.string.s_reload_lists_desc), "") {
+                    app.browse.reloadAll()
+                    actions.toast(context.getString(R.string.lists_reloading))
                 }
             }
         }

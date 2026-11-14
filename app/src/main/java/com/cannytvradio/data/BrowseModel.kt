@@ -116,6 +116,27 @@ class BrowseModel(
         scope.launch { similar.value = repo.similar(station).take(16) }
     }
 
+    /** Throws away every saved list and fetches Home, Regions and the current search fresh. */
+    fun reloadAll() {
+        repo.clearCache()
+        homeLoadedFor = null
+        loadHome(force = true)
+        _countries.value = emptyList()
+        if (_country.value.isNotEmpty()) {
+            scope.launch {
+                _countries.value = runCatching { repo.countries() }.getOrDefault(emptyList())
+                loadRegionNames()
+            }
+            loadRegionStations()
+        }
+        val q = _query.value
+        if (q.isNotBlank()) {
+            _query.value = ""
+            search(q)
+        }
+        similarFor = null
+    }
+
     private fun load(target: MutableStateFlow<Lane>, block: suspend () -> List<Station>): Job {
         target.value = Lane()
         return scope.launch {
