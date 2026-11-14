@@ -1,12 +1,24 @@
-# CannyTVRadio
+# CannyTVRadio: internet radio for Android TV
 
-Calm, ad-free internet radio for Android TV and Google TV.
+A free, ad-free internet radio app for Android TV, Google TV and Fire TV. About 50,000 stations, made for the remote.
 
 ![Favorites](docs/screens/favorites.png)
 
 - **Made for the remote.** Favorites are numbered presets, and the player is always one press away.
 - **Keeps playing.** Every station has backup streams. If one fails, the next one starts by itself.
 - **Quiet by design.** No ads, no accounts, no tracking. The screen goes dark while you listen.
+
+## Download
+
+On your TV, open the **Downloader** app and enter:
+
+```
+https://github.com/davbauer/CannyTVRadio/releases/latest/download/CannyTVRadio.apk
+```
+
+Install the downloaded file and you're done. This address always gives the newest version, and the app also offers updates by itself under **Settings → Updates**.
+
+One APK for every device with Android 5.0 or newer: Android TV, Google TV, Fire TV, TV boxes, tablets, phones and Chromebooks, on ARM and x86. All versions are on the [releases page](https://github.com/davbauer/CannyTVRadio/releases).
 
 ## Screens
 
@@ -28,29 +40,23 @@ Calm, ad-free internet radio for Android TV and Google TV.
 - Works with the remote, a keyboard, a mouse or touch
 - German and English
 
-## Install
+## Build it yourself
 
-One APK for every device: Android 5.0 or newer, any processor (ARM or x86). That covers Android TV and Google TV, Fire TV, TV boxes, tablets, phones and Chromebooks.
-
-The app isn't in the Play Store. Build it and install it with adb (JDK 17 and the Android SDK needed):
+You need JDK 17 and the Android SDK.
 
 ```bash
 ./gradlew assembleRelease
 ```
 
 ```bash
-adb connect <tv-ip>:5555
-```
-
-```bash
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-To turn on network debugging, enable the developer options on the TV.
+Releases are signed with the project's own key, and the app only installs updates signed with that key. A build of your own is signed with your debug key, so uninstall the release version first.
 
 ## Under the hood
 
-Kotlin, Jetpack Compose, Media3 and Coil, in one small app. It's tuned for slow TV chips: idle screens draw nothing, large surfaces are cached, and logos load once the remote pauses. Every change was measured on a real TV.
+Kotlin, Jetpack Compose, Media3 (ExoPlayer) and Coil, in one small app. It's tuned for slow TV chips: idle screens draw nothing, large surfaces are cached, and logos load once the remote pauses. Every change was measured on a real TV.
 
 ## Credits
 
