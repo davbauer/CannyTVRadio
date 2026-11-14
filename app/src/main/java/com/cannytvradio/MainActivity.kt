@@ -93,7 +93,8 @@ class MainActivity : ComponentActivity() {
             return true
         }
 
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+        // In the sync helper the remote only adjusts the sync; it must not switch the radio.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && !ui.syncHelper) {
             val player = app.player
             when (code) {
                 in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> if (!ui.typing) {

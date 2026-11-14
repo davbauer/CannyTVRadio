@@ -60,6 +60,9 @@ import com.cannytvradio.BuildConfig
 import com.cannytvradio.R
 import com.cannytvradio.RadioApp
 import com.cannytvradio.data.DimStyle
+import com.cannytvradio.data.SaverBrightness
+import com.cannytvradio.data.SaverReact
+import com.cannytvradio.data.SaverVisual
 import com.cannytvradio.data.Prefs
 import com.cannytvradio.data.UpdateError
 import com.cannytvradio.data.UpdateState
@@ -139,11 +142,59 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                         when (prefs.dimStyle) {
                             DimStyle.Time -> R.string.style_time
                             DimStyle.TimeAndInfo -> R.string.style_time_info
+                            DimStyle.AnalogClock -> R.string.style_analog
+                            DimStyle.Station -> R.string.style_station
                             DimStyle.Nothing -> R.string.style_nothing
                         },
                     ),
                     onStep = { by -> update { it.copy(dimStyle = it.dimStyle.step(by)) } },
                 )
+                Choice(
+                    stringResource(R.string.s_saver_visual),
+                    stringResource(R.string.s_saver_visual_desc),
+                    stringResource(
+                        when (prefs.saverVisual) {
+                            SaverVisual.None -> R.string.visual_none
+                            SaverVisual.Aurora -> R.string.style_aurora
+                            SaverVisual.Starfield -> R.string.style_starfield
+                        },
+                    ),
+                    onStep = { by -> update { it.copy(saverVisual = it.saverVisual.step(by)) } },
+                )
+                Choice(
+                    stringResource(R.string.s_saver_brightness),
+                    null,
+                    stringResource(
+                        when (prefs.saverBrightness) {
+                            SaverBrightness.Dim -> R.string.bright_dim
+                            SaverBrightness.Normal -> R.string.bright_normal
+                            SaverBrightness.Bright -> R.string.bright_bright
+                        },
+                    ),
+                    onStep = { by -> update { it.copy(saverBrightness = it.saverBrightness.step(by)) } },
+                )
+                Choice(
+                    stringResource(R.string.s_saver_react),
+                    stringResource(R.string.s_saver_react_desc),
+                    stringResource(
+                        when (prefs.saverReact) {
+                            SaverReact.Off -> R.string.react_off
+                            SaverReact.Subtle -> R.string.react_subtle
+                            SaverReact.Medium -> R.string.react_medium
+                            SaverReact.Strong -> R.string.react_strong
+                        },
+                    ),
+                    onStep = { by -> update { it.copy(saverReact = it.saverReact.step(by)) } },
+                )
+                Choice(
+                    stringResource(R.string.s_sync),
+                    stringResource(R.string.s_sync_desc),
+                    syncText(prefs.saverSyncMs),
+                    onStep = { by -> update { it.copy(saverSyncMs = (it.saverSyncMs + by * 10).coerceIn(-SYNC_RANGE, SYNC_RANGE)) } },
+                )
+                Action(stringResource(R.string.s_sync_helper), stringResource(R.string.s_sync_helper_desc), "") { ui.syncHelper = true }
+                // Shows the chosen screensaver right away; any key ends it.
+                Action(stringResource(R.string.s_dim_preview), stringResource(R.string.s_dim_preview_desc), "") { ui.darkNow = true }
             }
         }
 

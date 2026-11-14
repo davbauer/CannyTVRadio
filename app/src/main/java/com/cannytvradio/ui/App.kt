@@ -113,6 +113,8 @@ class Ui {
     var toast by mutableStateOf<String?>(null)
     var darkNow by mutableStateOf(false)
     var dimmed by mutableStateOf(false)
+    /** The sync helper is open: no dark screen, and the remote's keys belong to it. */
+    var syncHelper by mutableStateOf(false)
     var lastInput by mutableLongStateOf(SystemClock.uptimeMillis())
     /** Focus is somewhere in the page content (not the player or the tabs). */
     var contentFocused by mutableStateOf(false)
@@ -183,7 +185,7 @@ fun RadioRoot(app: RadioApp, ui: Ui) {
     LaunchedEffect(prefs.dimEnabled, prefs.dimAfter, active) {
         while (true) {
             val idle = SystemClock.uptimeMillis() - ui.lastInput
-            ui.dimmed = ui.darkNow || (prefs.dimEnabled && active && idle > prefs.dimAfter.seconds * 1000L)
+            ui.dimmed = !ui.syncHelper && (ui.darkNow || (prefs.dimEnabled && active && idle > prefs.dimAfter.seconds * 1000L))
             delay(500)
         }
     }
@@ -193,9 +195,9 @@ fun RadioRoot(app: RadioApp, ui: Ui) {
         if (active && prefs.dimEnabled) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
-    LaunchedEffect(ui.dimmed) {
+    LaunchedEffect(ui.dimmed, prefs.saverBrightness) {
         window?.attributes = window?.attributes?.apply {
-            screenBrightness = if (ui.dimmed) 0.01f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            screenBrightness = if (ui.dimmed) prefs.saverBrightness.backlight else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }
     }
 
@@ -263,7 +265,8 @@ fun RadioRoot(app: RadioApp, ui: Ui) {
                 }
             }
             }
-            Ambient(ui.dimmed, prefs.dimStyle, ps)
+            Ambient(ui.dimmed, hidden, prefs, ps, app)
+            if (ui.syncHelper) SyncHelper(app) { ui.syncHelper = false }
         }
     }
     // Back from anywhere in the page jumps to Play. From the player or the tabs it goes back a page, then out.
@@ -315,18 +318,19 @@ private fun Aurora(accent: Color, mood: Mood, playing: Boolean, ui: Ui) {
     )
 }
 
-private fun DrawScope.glow(bitmap: ImageBitmap, cx: Float, cy: Float, radius: Float) {
+internal fun DrawScope.glow(bitmap: ImageBitmap, cx: Float, cy: Float, radius: Float, alpha: Float = 1f) {
     val d = (radius * 2).toInt()
     drawImage(
         bitmap,
         dstOffset = IntOffset((cx - radius).toInt(), (cy - radius).toInt()),
         dstSize = IntSize(d, d),
+        alpha = alpha.coerceIn(0f, 1f),
         filterQuality = FilterQuality.Low,
     )
 }
 
 /** A 64 px round glow, transparent at the edge; scaled up it stays perfectly soft. */
-private fun glowBitmap(color: Color, alpha: Float): ImageBitmap {
+internal fun glowBitmap(color: Color, alpha: Float): ImageBitmap {
     val n = 64
     val bitmap = android.graphics.Bitmap.createBitmap(n, n, android.graphics.Bitmap.Config.ARGB_8888)
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -596,114 +600,21 @@ private fun Toast(ui: Ui, modifier: Modifier) {
 }
 
 /**
- * The dark screen, made for OLED and Mini-LED panels: black everywhere, the backlight at its lowest.
- *
- * The text block has a fixed width (long titles end in "…", digits all have the same width),
- * so nothing in it shifts when the time, station or song changes. It is rendered once into its
- * own image and only that image glides, on a slow path that never repeats (two sine waves with
- * periods of 13 and 17 minutes), with sub-pixel smoothing: no snapping to the pixel grid, no
- * flicker, and no pixel stays lit in one place. Any key brings the app back.
+ * The dark screen: black, the backlight turned down, and the chosen screensaver on top. Once the
+ * app underneath is hidden ([covered]), the screen is already black, so the black layer stops
+ * painting: at 4K that saves filling 8 million pixels on every frame.
  */
 @Composable
-private fun Ambient(visible: Boolean, style: DimStyle, ps: PlayerState) {
+private fun Ambient(visible: Boolean, covered: Boolean, prefs: com.cannytvradio.data.Prefs, ps: PlayerState, app: RadioApp) {
     AnimatedVisibility(visible, enter = fadeIn(tween(1500)), exit = fadeOut(tween(200))) {
-        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            if (style != DimStyle.Nothing) {
-                val context = LocalContext.current
-                val block = maxWidth * 0.5f
-                val reachX = (constraints.maxWidth - with(androidx.compose.ui.platform.LocalDensity.current) { block.toPx() }) / 2f * 0.9f
-                val reachY = constraints.maxHeight * 0.26f
-                // Start somewhere different each time, so repeated dark screens don't share a spot.
-                val seconds = remember { mutableFloatStateOf(Random.nextFloat() * 10_000f) }
-                var time by remember { mutableStateOf(DateFormat.getTimeFormat(context).format(Date())) }
-                LaunchedEffect(Unit) {
-                    var last = 0L
-                    var sinceClock = 0f
-                    while (true) {
-                        androidx.compose.runtime.withFrameNanos { now ->
-                            if (last != 0L) {
-                                val dt = (now - last) / 1e9f
-                                seconds.floatValue += dt
-                                sinceClock += dt
-                            }
-                            last = now
-                        }
-                        if (sinceClock > 5f) {
-                            sinceClock = 0f
-                            time = DateFormat.getTimeFormat(context).format(Date())
-                        }
-                    }
-                }
-                Column(
-                    Modifier
-                        .width(block)
-                        .graphicsLayer {
-                            // A finished image moved with filtering glides smoothly between pixels.
-                            compositingStrategy = CompositingStrategy.Offscreen
-                            val t = seconds.floatValue
-                            translationX = reachX * sin(t * TWO_PI / 780f)
-                            translationY = reachY * sin(t * TWO_PI / 1020f + 1.3f)
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CalmChange(time) { t ->
-                        Text(
-                            t,
-                            color = Color.White.copy(alpha = 0.45f),
-                            fontSize = 112.sp,
-                            fontWeight = FontWeight.ExtraLight,
-                            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
-                            maxLines = 1,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    if (style == DimStyle.TimeAndInfo) {
-                        val info = Modifier.fillMaxWidth()
-                        CalmChange(ps.station?.name.orEmpty()) { name ->
-                        Text(
-                            name,
-                            color = Color.White.copy(alpha = 0.34f),
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = info,
-                        )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        CalmChange(ps.song) { song ->
-                        Text(
-                            song,
-                            color = Color.White.copy(alpha = 0.26f),
-                            fontSize = 18.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = info,
-                        )
-                        }
-                    }
-                }
+        Box(Modifier.fillMaxSize().then(if (covered) Modifier else Modifier.background(Color.Black))) {
+            Screensaver(prefs.dimStyle, prefs.saverVisual, prefs.saverBrightness, prefs.saverReact, ps, revealed = covered) { ahead, out ->
+                // The exact position you hear right now, so the visuals land on the beat.
+                val player = app.player.player
+                val shift = ahead + prefs.saverDetectMs - prefs.saverSyncMs
+                if (player.isPlaying) app.player.sound.pulse(player.currentPosition + shift, out) else out.fill(0f)
             }
         }
     }
 }
 
-/** New text fades in with a slight rise while the old one fades out; slow enough to feel calm. */
-@Composable
-private fun CalmChange(value: String, content: @Composable (String) -> Unit) {
-    AnimatedContent(
-        targetState = value,
-        transitionSpec = {
-            (fadeIn(tween(900, delayMillis = 200)) + slideInVertically(tween(1100)) { it / 6 }) togetherWith
-                fadeOut(tween(700))
-        },
-        contentAlignment = Alignment.Center,
-        label = "calm",
-        modifier = Modifier.fillMaxWidth(),
-    ) { content(it) }
-}
-
-private const val TWO_PI = (2 * Math.PI).toFloat()

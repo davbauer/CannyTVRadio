@@ -9,8 +9,17 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class DimAfter(val seconds: Int) { S10(10), S30(30), M1(60), M5(300) }
 
-/** What the dark screen shows. */
-enum class DimStyle { Time, TimeAndInfo, Nothing }
+/** What the dark screen shows in front. */
+enum class DimStyle { Time, TimeAndInfo, AnalogClock, Station, Nothing }
+
+/** Moving background behind it; none by default. */
+enum class SaverVisual { None, Aurora, Starfield }
+
+/** How visible the screensaver is: scales its content and the TV backlight. */
+enum class SaverBrightness(val level: Float, val backlight: Float) { Dim(0.6f, 0.01f), Normal(1f, 0.06f), Bright(1.6f, 0.3f) }
+
+/** How strongly the visuals move with the music. */
+enum class SaverReact(val amount: Float) { Off(0f), Subtle(0.45f), Medium(0.9f), Strong(1.5f) }
 
 enum class StreamOrder { Quality, Reliable }
 
@@ -19,6 +28,13 @@ data class Prefs(
     val dimEnabled: Boolean = true,
     val dimAfter: DimAfter = DimAfter.S10,
     val dimStyle: DimStyle = DimStyle.TimeAndInfo,
+    val saverVisual: SaverVisual = SaverVisual.None,
+    val saverBrightness: SaverBrightness = SaverBrightness.Normal,
+    val saverReact: SaverReact = SaverReact.Off,
+    /** Shifts the visuals against the music on this TV: positive shows the light later. Set with the sync helper. */
+    val saverSyncMs: Int = 0,
+    /** How late the beat detection is on this TV, measured by the sync helper and made up for. */
+    val saverDetectMs: Int = 0,
     val resumeOnStart: Boolean = true,
     val streamOrder: StreamOrder = StreamOrder.Quality,
     /** Bring every station to the same loudness. */
@@ -47,6 +63,11 @@ class Settings(private val sp: SharedPreferences) {
             .putBoolean("dimEnabled", next.dimEnabled)
             .putString("dimAfter", next.dimAfter.name)
             .putString("dimStyle", next.dimStyle.name)
+            .putString("saverVisual", next.saverVisual.name)
+            .putString("saverBrightness", next.saverBrightness.name)
+            .putString("saverReact", next.saverReact.name)
+            .putInt("saverSyncMs", next.saverSyncMs)
+            .putInt("saverDetectMs", next.saverDetectMs)
             .putBoolean("resumeOnStart", next.resumeOnStart)
             .putString("streamOrder", next.streamOrder.name)
             .putBoolean("normalize", next.normalize)
@@ -63,8 +84,15 @@ class Settings(private val sp: SharedPreferences) {
         dimStyle = when (val v = sp.getString("dimStyle", null)) {
             "Clock" -> DimStyle.TimeAndInfo
             "Black" -> DimStyle.Nothing
+            // The bouncing logo was removed.
+            "Bounce" -> DimStyle.Station
             else -> enumOr(v, DimStyle.TimeAndInfo)
         },
+        saverVisual = enumOr(sp.getString("saverVisual", null), SaverVisual.None),
+        saverBrightness = enumOr(sp.getString("saverBrightness", null), SaverBrightness.Normal),
+        saverReact = enumOr(sp.getString("saverReact", null), SaverReact.Off),
+        saverSyncMs = sp.getInt("saverSyncMs", 0),
+        saverDetectMs = sp.getInt("saverDetectMs", 0),
         resumeOnStart = sp.getBoolean("resumeOnStart", true),
         streamOrder = enumOr(sp.getString("streamOrder", null), StreamOrder.Quality),
         normalize = sp.getBoolean("normalize", true),

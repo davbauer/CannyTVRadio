@@ -35,7 +35,7 @@ One APK for every device with Android 5.0 or newer: Android TV, Google TV, Fire 
 | ![Regions](docs/screens/regions.png) | ![Now playing](docs/screens/player.png) |
 | **Regions.** Every country, and the states of Germany, Austria and Switzerland. | **Now playing.** The song, the station and similar stations. |
 | ![Equalizer](docs/screens/equalizer.png) | ![Dark screen](docs/screens/darkscreen.png) |
-| **Sound.** Even volume, 12 presets and 3 custom profiles. | **Dark screen.** A slowly gliding clock, safe for OLED and Mini-LED. |
+| **Sound.** Even volume, 12 presets and 3 custom profiles. | **Dark screen.** A clock or the station, over northern lights or stars that move with the music. Safe for OLED and Mini-LED. |
 
 ## Features
 
@@ -43,6 +43,7 @@ One APK for every device with Android 5.0 or newer: Android TV, Google TV, Fire 
 - Number keys 1–9 play your favorites; hold OK on one to move it
 - Even out volume across stations, plus an equalizer you can tune by ear
 - Sleep timer with a soft fade-out
+- A dark screen you put together yourself, with visuals that follow the beat and a sync helper for your TV
 - Works with the remote, a keyboard, a mouse or touch
 - German and English
 
