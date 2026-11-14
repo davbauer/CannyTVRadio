@@ -1,6 +1,6 @@
 # CannyTVRadio: internet radio for Android TV
 
-A free, ad-free internet radio app for Android TV, Google TV and Fire TV. About 50,000 stations, made for the remote.
+A free, ad-free and open-source internet radio app for Android TV, Google TV and Fire TV. About 50,000 stations, made for the remote.
 
 ![Favorites](docs/screens/favorites.png)
 
@@ -67,3 +67,7 @@ Kotlin, Jetpack Compose, Media3 (ExoPlayer) and Coil, in one small app. It's tun
 ## Credits
 
 Station data from [radio-browser.info](https://www.radio-browser.info) and TuneIn. Icons adapted from [Lucide](https://lucide.dev) (ISC).
+
+## License
+
+[MIT](LICENSE). Use it, change it and share it; keep the copyright notice. Updates from this project only install when signed with its release key, so copies can't pose as official updates.
