@@ -150,7 +150,7 @@ class RadioBrowser(private val http: Http, private val prefs: SharedPreferences)
 
         private fun parse(o: JSONObject) = Station(
             id = o.getString("stationuuid"),
-            name = o.optString("name").trim(),
+            name = Station.cleanName(o.optString("name")),
             streams = listOf(o.optString("url_resolved"), o.optString("url"))
                 .map { it.trim() }.filter { it.startsWith("http") }.distinct(),
             favicon = o.optString("favicon").trim().takeIf { it.startsWith("http") } ?: "",

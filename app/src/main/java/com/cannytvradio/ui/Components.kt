@@ -94,11 +94,11 @@ import java.util.Locale
 
 /** Tiles per row everywhere; their width is computed from the screen, so rows always show whole tiles. */
 const val COLUMNS = 4
-val GAP = 22.dp
+val GAP = 26.dp
 val TILE_WIDTH = 148.dp
 /** Artwork is 1.42 times as wide as high, whatever the tile width. */
 const val ART_RATIO = 1.42f
-val EDGE = 28.dp
+val EDGE = 26.dp
 val INK = Color(0xFF0B0E16)
 
 /**

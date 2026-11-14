@@ -31,7 +31,7 @@ class TuneIn(private val http: Http) {
                 val guide = it.optString("guide_id")
                 Station(
                     id = "tunein:$guide",
-                    name = it.optString("text").trim(),
+                    name = Station.cleanName(it.optString("text")),
                     streams = emptyList(),
                     favicon = it.optString("image"),
                     bitrate = it.optString("bitrate").toIntOrNull() ?: 0,

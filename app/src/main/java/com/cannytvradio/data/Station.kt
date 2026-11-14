@@ -49,7 +49,7 @@ data class Station(
     companion object {
         fun fromJson(o: JSONObject) = Station(
             id = o.getString("id"),
-            name = o.optString("name"),
+            name = cleanName(o.optString("name")),
             streams = o.optJSONArray("streams").strings(),
             favicon = o.optString("favicon"),
             homepage = o.optString("homepage"),
@@ -68,6 +68,24 @@ data class Station(
             tuneInId = o.optString("tuneInId"),
             subtitle = o.optString("subtitle"),
         )
+
+        private val TECH = Regex(
+            "\\b(\\d{2,3}\\s?(k|kb|kbps|kbit|kbit/s)|aac\\+?|he-aac|mp3|ogg|opus|flac|hq|lq|hls)\\b",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /**
+         * Name without the technical extras the directory often carries:
+         * "FM4 | ORF | HQ" -> "FM4", "Radio Paradise Main Mix (EU) 320k AAC" -> "Radio Paradise Main Mix (EU)".
+         */
+        fun cleanName(raw: String): String {
+            val first = raw.split(" | ", " || ").first().trim()
+            val cleaned = first.replace(TECH, " ")
+                .replace(Regex("\\(\\s*\\)|\\[\\s*]"), " ")
+                .replace(Regex("\\s{2,}"), " ")
+                .trim(' ', '-', '|', '/', ',', '_', '#', '*', '~')
+            return cleaned.ifBlank { raw.trim() }
+        }
 
         /** Lowercase, umlauts spelled out, accents and punctuation removed: "Ö3 Wien!" -> "oe3 wien". */
         fun normalize(s: String): String {

@@ -279,7 +279,8 @@ class PlayerController(
     }
 
     private fun onSong(raw: String?) {
-        val title = raw?.trim()?.trim('-', ' ').orEmpty()
+        // Stations often append their slogan: "Artist - Title | FM4 Sounds Like FM4" -> "Artist - Title".
+        val title = raw?.split(" | ")?.first()?.trim()?.trim('-', ' ').orEmpty()
         val station = _state.value.station
         if (title.length < 3 || title.equals(station?.name, ignoreCase = true)) return
         _state.update { s ->

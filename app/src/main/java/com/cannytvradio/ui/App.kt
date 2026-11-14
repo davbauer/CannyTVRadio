@@ -120,6 +120,8 @@ class Ui {
     var initialFocusDone = false
     val focus = FocusMemory()
     val playFocus = FocusRequester()
+    /** One focus target per tab in the top bar. */
+    val tabFocus = Tab.entries.associateWith { FocusRequester() }
 
     fun openPlayer() {
         if (tab != Tab.NowPlaying) back = tab
@@ -226,7 +228,16 @@ fun RadioRoot(app: RadioApp, ui: Ui) {
                             .onFocusChanged { ui.contentFocused = it.hasFocus }
                             // Down never leaves the page (it used to jump into the player when nothing was below),
                             // and coming back from the player or the tabs lands on the tile you were on.
-                            .focusProperties { exit = { if (it == FocusDirection.Down) FocusRequester.Cancel else FocusRequester.Default } }
+                            .focusProperties {
+                                exit = {
+                                    when (it) {
+                                        FocusDirection.Down -> FocusRequester.Cancel
+                                        // Up from the top of a page always lands on the current tab.
+                                        FocusDirection.Up -> ui.tabFocus.getValue(if (ui.tab == Tab.NowPlaying) ui.back else ui.tab)
+                                        else -> FocusRequester.Default
+                                    }
+                                }
+                            }
                             .focusRestorer()
                             .focusGroup(),
                     ) {
@@ -335,7 +346,7 @@ private val TOP_TABS = listOf(Tab.Favorites, Tab.Home, Tab.Search, Tab.Regions)
 @Composable
 private fun TopBar(app: RadioApp, ui: Ui) {
     val offline by app.repo.offline.collectAsState()
-    val requesters = remember { Tab.entries.associateWith { FocusRequester() } }
+    val requesters = ui.tabFocus
     Row(
         Modifier
             .fillMaxWidth()
