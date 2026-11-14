@@ -75,30 +75,9 @@ def api(method, url, body=None, content_type="application/json"):
     with urllib.request.urlopen(req) as r:
         return json.loads(r.read() or b"{}")
 
-latest = f"https://github.com/{REPO}/releases/latest/download/CannyTVRadio.apk"
-bullets = lambda items: "\n".join(f"- {c}" for c in items)
-body = f"""## Install on Android TV, Google TV or Fire TV
-
-Open the **Downloader** app on your TV and enter:
-
-```
-{latest}
-```
-
-Then open the downloaded file and install it. To update later, open the same address again, or use **Settings → Updates** inside the app.
-
-Works on Android 5.0 or newer, on ARM and x86 devices: TVs, TV boxes, Fire TV sticks, tablets, phones and Chromebooks.
-
-## What's new
-
-{bullets(notes["en"])}
-
-## Neu in dieser Version
-
-{bullets(notes["de"])}
-
-SHA-256 of `{versioned}`: `{sha}`
-"""
+# The release page shows only what is new, in English. The app shows the changes in the
+# viewer's language from update.json.
+body = "## What's new\n\n" + "\n".join(f"- {c}" for c in notes["en"]) + "\n"
 release = api("POST", f"https://api.github.com/repos/{REPO}/releases", json.dumps({
     "tag_name": tag, "target_commitish": "main", "name": f"CannyTVRadio {version}",
     "body": body, "make_latest": "true"}).encode())

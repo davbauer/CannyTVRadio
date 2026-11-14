@@ -10,13 +10,19 @@ A free, ad-free internet radio app for Android TV, Google TV and Fire TV. About 
 
 ## Download
 
-On your TV, open the **Downloader** app and enter:
+On your TV, open the **Downloader** app and enter the short address:
+
+```
+https://shorturl.at/MvXKi
+```
+
+Or the direct address, straight from GitHub:
 
 ```
 https://github.com/davbauer/CannyTVRadio/releases/latest/download/CannyTVRadio.apk
 ```
 
-Install the downloaded file and you're done. This address always gives the newest version, and the app also offers updates by itself under **Settings → Updates**.
+Both always give the newest version. Install the downloaded file and you're done. Later updates show up inside the app under **Settings → Updates**.
 
 One APK for every device with Android 5.0 or newer: Android TV, Google TV, Fire TV, TV boxes, tablets, phones and Chromebooks, on ARM and x86. All versions are on the [releases page](https://github.com/davbauer/CannyTVRadio/releases).
 

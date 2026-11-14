@@ -1,0 +1,10 @@
+{
+  "en": [
+    "Clear reasons when an update can't be checked or installed",
+    "Looks for updates a minute after start, then every 4 hours"
+  ],
+  "de": [
+    "Klare Gründe, wenn ein Update nicht geprüft oder installiert werden kann",
+    "Sucht eine Minute nach dem Start nach Updates, danach alle 4 Stunden"
+  ]
+}

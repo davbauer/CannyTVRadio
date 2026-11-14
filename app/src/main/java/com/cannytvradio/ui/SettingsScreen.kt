@@ -61,6 +61,7 @@ import com.cannytvradio.R
 import com.cannytvradio.RadioApp
 import com.cannytvradio.data.DimStyle
 import com.cannytvradio.data.Prefs
+import com.cannytvradio.data.UpdateError
 import com.cannytvradio.data.UpdateState
 import com.cannytvradio.data.StreamOrder
 import com.cannytvradio.player.EQ_BANDS
@@ -110,7 +111,7 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                         UpdateState.Step.Verifying -> stringResource(R.string.update_verifying)
                         UpdateState.Step.NeedsPermission -> stringResource(R.string.update_allow)
                         UpdateState.Step.Installing -> stringResource(R.string.update_installing)
-                        UpdateState.Step.Failed -> stringResource(R.string.update_failed)
+                        UpdateState.Step.Failed -> updateErrorText(update.error)
                         UpdateState.Step.Idle -> null
                     }
                     Action(stringResource(R.string.update_install), status, "") {
@@ -242,7 +243,7 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                         updateState.checking -> stringResource(R.string.checking)
                         updateState.available != null -> stringResource(R.string.update_available, updateState.available!!.versionName)
                         updateState.lastCheckOk == true -> stringResource(R.string.update_current)
-                        updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed)
+                        updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed) + " " + updateErrorText(updateState.error)
                         else -> null
                     },
                     stringResource(R.string.s_check_updates),
@@ -261,6 +262,21 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                 modifier = Modifier.padding(top = 10.dp, start = 6.dp),
             )
         }
+    }
+}
+
+/** The exact reason an update check or install failed, with technical detail where useful. */
+@Composable
+private fun updateErrorText(error: UpdateError?): String {
+    if (error == null) return stringResource(R.string.update_err_other, "?")
+    return when (error.kind) {
+        UpdateError.Kind.Offline -> stringResource(R.string.update_err_offline)
+        UpdateError.Kind.Http -> stringResource(R.string.update_err_http, error.detail)
+        UpdateError.Kind.Checksum -> stringResource(R.string.update_err_checksum)
+        UpdateError.Kind.Size -> stringResource(R.string.update_err_size, error.detail)
+        UpdateError.Kind.Signature -> stringResource(R.string.update_err_signature)
+        UpdateError.Kind.NoInstaller -> stringResource(R.string.update_err_installer, error.detail)
+        UpdateError.Kind.Other -> stringResource(R.string.update_err_other, error.detail)
     }
 }
 

@@ -40,7 +40,7 @@ class RadioApp : Application(), ImageLoaderFactory {
         player = PlayerController(this, repo, scope)
         browse = BrowseModel(repo, settings, scope)
         updater = com.cannytvradio.data.Updater(this, http, scope)
-        updater.check()
+        updater.schedule()
         scope.launch {
             settings.prefs.collect {
                 player.sound.normalize = it.normalize

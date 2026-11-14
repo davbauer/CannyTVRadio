@@ -136,7 +136,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         app.updater.resumeAfterPermission(this)
-        app.updater.check()
     }
 
     override fun onStop() {

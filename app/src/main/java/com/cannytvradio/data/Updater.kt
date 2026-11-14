@@ -24,6 +24,11 @@ import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 
+/** What went wrong, with the technical detail for anything unexpected. */
+data class UpdateError(val kind: Kind, val detail: String = "") {
+    enum class Kind { Offline, Http, Checksum, Size, Signature, NoInstaller, Other }
+}
+
 /** A newer version announced in the release's update.json. */
 data class UpdateInfo(
     val versionCode: Int,
@@ -41,6 +46,8 @@ data class UpdateState(
     val lastCheckOk: Boolean? = null,
     val step: Step = Step.Idle,
     val progress: Float = 0f,
+    /** Why the last check or install failed, shown in the settings. */
+    val error: UpdateError? = null,
 ) {
     enum class Step { Idle, Downloading, Verifying, NeedsPermission, Installing, Failed }
 }
@@ -70,11 +77,14 @@ class Updater(private val context: Context, private val http: Http, private val 
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(checking = false, lastCheckOk = false) }
+                _state.update { it.copy(checking = false, lastCheckOk = false, error = describe(e)) }
                 return@launch
             }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
-            _state.update { it.copy(checking = false, lastCheckOk = true, available = info?.takeIf { i -> UpdateFeed.isNewer(i, BuildConfig.VERSION_CODE) }) }
+            // The dot and the update section only exist while a newer version is really there.
+            _state.update {
+                it.copy(checking = false, lastCheckOk = true, error = null, available = info?.takeIf { i -> UpdateFeed.isNewer(i, BuildConfig.VERSION_CODE) })
+            }
         }
     }
 
@@ -99,15 +109,21 @@ class Updater(private val context: Context, private val http: Http, private val 
                 throw e
             } catch (e: Exception) {
                 android.util.Log.w("CannyTVRadio", "update: download failed: $e")
-                _state.update { it.copy(step = UpdateState.Step.Failed) }
+                _state.update { it.copy(step = UpdateState.Step.Failed, error = describe(e)) }
                 return@launch
             }
-            _state.update { it.copy(step = UpdateState.Step.Verifying) }
-            val trusted = withContext(Dispatchers.IO) { UpdateFeed.sha256(file) == info.sha256.lowercase() && signedByUs(file) }
-            if (!trusted) {
-                android.util.Log.w("CannyTVRadio", "update: rejected, checksum or signature does not match")
+            _state.update { it.copy(step = UpdateState.Step.Verifying, error = null) }
+            val problem = withContext(Dispatchers.IO) {
+                when {
+                    UpdateFeed.sha256(file) != info.sha256.lowercase() -> UpdateError(UpdateError.Kind.Checksum)
+                    !signedByUs(file) -> UpdateError(UpdateError.Kind.Signature)
+                    else -> null
+                }
+            }
+            if (problem != null) {
+                android.util.Log.w("CannyTVRadio", "update: rejected: ${problem.kind}")
                 file.delete()
-                _state.update { it.copy(step = UpdateState.Step.Failed) }
+                _state.update { it.copy(step = UpdateState.Step.Failed, error = problem) }
                 return@launch
             }
             _state.update { it.copy(step = UpdateState.Step.Installing) }
@@ -115,8 +131,19 @@ class Updater(private val context: Context, private val http: Http, private val 
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { activity.startActivity(intent) }.onFailure {
-                _state.update { s -> s.copy(step = UpdateState.Step.Failed) }
+            runCatching { activity.startActivity(intent) }.onFailure { e ->
+                _state.update { s -> s.copy(step = UpdateState.Step.Failed, error = UpdateError(UpdateError.Kind.NoInstaller, e.javaClass.simpleName)) }
+            }
+        }
+    }
+
+    /** Looks for updates 1 minute after start, then every 4 hours, so startup stays quick. */
+    fun schedule() {
+        scope.launch {
+            kotlinx.coroutines.delay(FIRST_CHECK_DELAY_MS)
+            while (true) {
+                check()
+                kotlinx.coroutines.delay(CHECK_EVERY_MS)
             }
         }
     }
@@ -136,7 +163,7 @@ class Updater(private val context: Context, private val http: Http, private val 
         val file = File(dir, "CannyTVRadio-${info.versionName}.apk")
         _state.update { it.copy(step = UpdateState.Step.Downloading, progress = 0f) }
         http.client.newCall(Request.Builder().url(info.url).build()).execute().use { r ->
-            if (!r.isSuccessful) throw java.io.IOException("HTTP ${r.code}")
+            if (!r.isSuccessful) throw HttpFailure(r.code)
             val body = r.body ?: throw java.io.IOException("empty")
             val total = body.contentLength().takeIf { it > 0 } ?: info.size
             body.byteStream().use { input ->
@@ -153,7 +180,7 @@ class Updater(private val context: Context, private val http: Http, private val 
                 }
             }
         }
-        if (info.size > 0 && file.length() != info.size) throw java.io.IOException("size mismatch")
+        if (info.size > 0 && file.length() != info.size) throw SizeMismatch(file.length(), info.size)
         file
     }
 
@@ -172,6 +199,19 @@ class Updater(private val context: Context, private val http: Http, private val 
         return certs.any { digest(it.toByteArray()) == RELEASE_CERT_SHA256 }
     }
 
+    private class HttpFailure(val code: Int) : java.io.IOException("HTTP $code")
+    private class SizeMismatch(val got: Long, val want: Long) : java.io.IOException("$got of $want bytes")
+
+    /** Turns an exception into something the settings can explain. */
+    private fun describe(e: Exception): UpdateError = when {
+        e is HttpFailure -> UpdateError(UpdateError.Kind.Http, "HTTP ${e.code}")
+        e is SizeMismatch -> UpdateError(UpdateError.Kind.Size, e.message.orEmpty())
+        e.message?.startsWith("HTTP ") == true -> UpdateError(UpdateError.Kind.Http, e.message.orEmpty())
+        e is java.net.UnknownHostException || e is java.net.ConnectException || e is java.net.SocketTimeoutException ->
+            UpdateError(UpdateError.Kind.Offline, e.javaClass.simpleName)
+        else -> UpdateError(UpdateError.Kind.Other, "${e.javaClass.simpleName}: ${e.message.orEmpty()}".take(160))
+    }
+
     private fun digest(bytes: ByteArray) =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
@@ -179,7 +219,9 @@ class Updater(private val context: Context, private val http: Http, private val 
         const val FEED = "${UpdateFeed.REPO}/releases/latest/download/update.json"
         /** SHA-256 of the CannyTVRadio release signing certificate. */
         private const val RELEASE_CERT_SHA256 = "ffbe18d85267d7c1a98ddb41175faeec3d9cc38f3086e160b8c833ab4c848001"
-        private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
+        /** How often the app looks for updates while it runs; the first look is 1 minute after start. */
+        const val CHECK_EVERY_MS = 4 * 60 * 60 * 1000L
+        const val FIRST_CHECK_DELAY_MS = 60_000L
     }
 }
 

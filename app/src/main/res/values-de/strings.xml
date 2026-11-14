@@ -130,9 +130,15 @@
     <string name="update_verifying">Download wird geprüft</string>
     <string name="update_allow">Erlaube CannyTVRadio, Apps zu installieren, und komm dann hierher zurück.</string>
     <string name="update_installing">Android installiert das Update.</string>
-    <string name="update_failed">Das Update konnte nicht geladen oder geprüft werden. Es wurde nichts installiert.</string>
     <string name="s_updates">Updates</string>
     <string name="s_check_updates">Jetzt prüfen</string>
     <string name="update_current">Du hast die neueste Version.</string>
     <string name="update_check_failed">Gerade nicht prüfbar.</string>
+    <string name="update_err_offline">Keine Internetverbindung.</string>
+    <string name="update_err_http">Der Server antwortete mit %1$s.</string>
+    <string name="update_err_checksum">Der Download ist beschädigt (Prüfsumme stimmt nicht). Es wurde nichts installiert.</string>
+    <string name="update_err_size">Der Download ist unvollständig (%1$s). Es wurde nichts installiert.</string>
+    <string name="update_err_signature">Die Datei ist nicht mit dem CannyTVRadio-Schlüssel signiert. Es wurde nichts installiert.</string>
+    <string name="update_err_installer">Auf diesem Gerät wurde kein Installer gefunden (%1$s).</string>
+    <string name="update_err_other">Unerwarteter Fehler: %1$s</string>
 </resources>
