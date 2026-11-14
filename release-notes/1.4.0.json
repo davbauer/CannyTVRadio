@@ -1,0 +1,14 @@
+{
+  "en": [
+    "Much better beat detection: it follows the kick drum and the tempo, and keeps the beat when someone talks over the music",
+    "Visuals react to more than the beat: bass, hi-hats and the tempo itself",
+    "Sync helper: test the starfield and the northern lights with the knocks and adjust them right there",
+    "Visuals stay in sync on more stations, including live streams"
+  ],
+  "de": [
+    "Viel bessere Takterkennung: Sie folgt Bassdrum und Tempo und hält den Takt, auch wenn jemand über die Musik spricht",
+    "Die Bilder reagieren auf mehr als den Takt: Bass, Hi-Hats und das Tempo selbst",
+    "Sync-Hilfe: Sternenflug und Polarlicht mit dem Klopfen testen und direkt dort einstellen",
+    "Die Bilder bleiben auf mehr Sendern im Takt, auch bei Live-Streams"
+  ]
+}

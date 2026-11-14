@@ -115,6 +115,8 @@ class Ui {
     var dimmed by mutableStateOf(false)
     /** The sync helper is open: no dark screen, and the remote's keys belong to it. */
     var syncHelper by mutableStateOf(false)
+    /** The sync helper shows the real screensaver: the app underneath is hidden so it can show through. */
+    var syncPreview by mutableStateOf(false)
     var lastInput by mutableLongStateOf(SystemClock.uptimeMillis())
     /** Focus is somewhere in the page content (not the player or the tabs). */
     var contentFocused by mutableStateOf(false)
@@ -218,7 +220,7 @@ fun RadioRoot(app: RadioApp, ui: Ui) {
             }
         }
         Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (hidden) 0f else 1f }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (hidden || ui.syncPreview) 0f else 1f }) {
             Aurora(accent, mood, ps.playing, ui)
             Row(Modifier.fillMaxSize()) {
                 PlayerPanel(app, ps, ui, actions)

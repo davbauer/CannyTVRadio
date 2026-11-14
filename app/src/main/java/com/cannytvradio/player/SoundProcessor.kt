@@ -75,110 +75,70 @@ class SoundProcessor : BaseAudioProcessor() {
 
     @Volatile private var dirty = true
 
-    /*
-     * Music analysis for the screensaver, in steps of HOP frames (about 11 ms): how energetic the
-     * music is compared to the last seconds, and beats (sudden jumps in bass or overall energy).
-     * Each step is stored with its position in the stream, so the screen can show exactly the
-     * step you are hearing, even though audio is processed about half a second ahead.
-     */
-    private val hopEnd = LongArray(HISTORY)
-    private val hopEnergy = FloatArray(HISTORY)
-    private val hopBeat = FloatArray(HISTORY)
-    @Volatile private var head = -1
-    private val onsetAt = LongArray(64)
-    /** Beats found so far; [onset] gives each one's position in the stream. */
-    @Volatile var onsetTotal = 0L
-        private set
-    /** Sample rate of what is playing, for turning stream positions into time. */
-    val sampleRate: Int get() = analysisRate
-
-    /** Stream position (in frames, see [sampleRate]) where beat number [index] was found. */
-    fun onset(index: Long): Long = onsetAt[(index % onsetAt.size).toInt()]
+    /** Finds energy and beats for the screensaver; replaced when the sample rate changes. */
+    @Volatile private var tracker: BeatTracker? = null
     private var lastLog = 0L
-    @Volatile private var analysisRate = 0
-    private var position = 0L // frames since the stream started (or since the last flush)
-    private var hopCount = 0
-    private var hopE = 0f
-    private var hopB = 0f
-    private var low1 = 0f
-    private var low2 = 0f
-    private var lowK = 0f
-    private var longE = 0f
-    private var shortE = 0f
-    private var midE = 0f
-    private var midB = 0f
-    private var beat = 0f
-    private var sinceBeat = 1f
-    private var kLong = 0f
-    private var kShort = 0f
-    private var kMid = 0f
-    private var kBeat = 0f
-    private var hopSeconds = 0f
+
+    // Which stream is playing (counted up on every flush), and the player position at which its
+    // first processed sample was heard. Ordinary streams start at 0; live HLS streams start
+    // wherever their live window is.
+    @Volatile private var epoch = 0
+    @Volatile private var anchorEpoch = -1
+    @Volatile private var startMs = 0L
 
     /**
-     * Energy (0..1, about 0.5 for the song's usual level) and beat (1 right on a beat, fading
+     * Lets the visuals follow [player] exactly, also for streams whose positions don't start at
+     * zero: when audio is first heard after a new start, the position at that moment is noted.
+     */
+    fun follow(player: androidx.media3.exoplayer.ExoPlayer) {
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onAudioPositionAdvancing(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                playoutStartSystemTimeMs: Long,
+            ) {
+                // After a pause the positions simply continue; only a new start needs an anchor.
+                if (anchorEpoch == epoch) return
+                val started = player.currentPosition - (System.currentTimeMillis() - playoutStartSystemTimeMs)
+                // Small differences are timing noise; a clear offset is a stream that doesn't start at 0.
+                startMs = if (abs(started) > 250) started else 0L
+                anchorEpoch = epoch
+                android.util.Log.i("CannyTVRadio", "sound: playout started at position $started ms, visuals count from $startMs ms")
+            }
+        })
+    }
+
+    /** Beats heard so far; [onset] gives each one's position. */
+    val onsetTotal: Long get() = tracker?.onsetTotal ?: 0L
+    /** Sample rate of what is playing, for turning stream positions into time. */
+    val sampleRate: Int get() = tracker?.rate ?: 0
+
+    /** Stream position (in frames, see [sampleRate]) of beat number [index]. */
+    fun onset(index: Long): Long = tracker?.onset(index) ?: 0L
+
+    /**
+     * Energy (0..1, about 0.5 for the music's usual level) and beat (1 right on a beat, fading
      * within a quarter second) of the audio at [positionMs], the player's current position,
      * written into [out]. Without a matching position it uses audio from about half a second ago.
      */
     fun pulse(positionMs: Long, out: FloatArray) {
-        out[0] = 0f
-        out[1] = 0f
-        val h = head
-        val r = analysisRate
-        if (h < 0 || r == 0) return
-        val newest = hopEnd[h]
-        var want = positionMs * r / 1000
-        val matched = want <= newest + r / 10 && want >= newest - 3L * r
-        if (!matched) want = newest - r * 45L / 100
+        val t = tracker
+        if (t == null) {
+            out[0] = 0f
+            out[1] = 0f
+            return
+        }
+        val start = if (anchorEpoch == epoch) startMs else 0L
+        val frame = (positionMs - start) * t.rate / 1000
+        val matched = t.read(frame, out)
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastLog > 20_000) {
             lastLog = now
-            android.util.Log.i("CannyTVRadio", "sound: visuals ${if (matched) "follow the position" else "use a fixed delay"}, audio ahead by ${(newest - want) * 1000 / r} ms")
+            android.util.Log.i(
+                "CannyTVRadio",
+                "sound: visuals ${if (matched) "follow the position" else "use a fixed delay"}, audio ahead by ${t.lead(frame) * 1000 / t.rate} ms, " +
+                    "tempo ${t.bpm.toInt()} BPM, sure ${(t.confidence * 100).toInt()}%",
+            )
         }
-        var i = h
-        var prev = Long.MAX_VALUE
-        var found = h
-        for (step in 0 until HISTORY) {
-            val f = hopEnd[i]
-            if (f > prev) break // older than the current stream
-            found = i
-            if (f <= want) break
-            prev = f
-            i = (i - 1 + HISTORY) % HISTORY
-        }
-        out[0] = hopEnergy[found]
-        out[1] = hopBeat[found]
-    }
-
-    private fun endHop() {
-        val e = hopE / HOP
-        val b = hopB / HOP
-        hopE = 0f
-        hopB = 0f
-        hopCount = 0
-        position += HOP
-        // Beats: this step against the last third of a second, in the bass and overall.
-        val fluxB = if (midB > 1e-8f) b / midB else 0f
-        val fluxE = if (midE > 1e-8f) e / midE else 0f
-        midB += (b - midB) * kMid
-        midE += (e - midE) * kMid
-        longE += (e - longE) * kLong
-        shortE += (e - shortE) * kShort
-        sinceBeat += hopSeconds
-        beat *= kBeat
-        val flux = max(fluxB, fluxE * 0.85f)
-        if (flux > 1.45f && sinceBeat > 0.15f && e > 1e-6f) {
-            beat = max(beat, ((flux - 1.15f) / 1.8f).coerceIn(0.4f, 1f))
-            sinceBeat = 0f
-            onsetAt[(onsetTotal % onsetAt.size).toInt()] = position
-            onsetTotal++
-        }
-        val rel = if (longE > 1e-6f) sqrt(shortE / longE) else 0f
-        val next = (head + 1) % HISTORY
-        hopEnergy[next] = ((rel - 0.45f) / 1.1f).coerceIn(0f, 1f)
-        hopBeat[next] = beat
-        hopEnd[next] = position
-        head = next
     }
 
     private var channels = 0
@@ -197,13 +157,7 @@ class SoundProcessor : BaseAudioProcessor() {
         if (format.encoding != C.ENCODING_PCM_16BIT) throw UnhandledAudioFormatException(format)
         channels = format.channelCount
         rate = format.sampleRate
-        hopSeconds = HOP.toFloat() / rate
-        lowK = (1 - exp(-2 * PI * 150 / rate)).toFloat()
-        kLong = (1 - exp(-hopSeconds / 3.0)).toFloat()
-        kShort = (1 - exp(-hopSeconds / 0.1)).toFloat()
-        kMid = (1 - exp(-hopSeconds / 0.33)).toFloat()
-        kBeat = exp(-hopSeconds / 0.22).toFloat()
-        analysisRate = rate
+        if (tracker?.rate != rate) tracker = BeatTracker(rate)
         envCoef = coef(1.5f)
         attack = coef(0.3f)
         release = coef(3f)
@@ -222,6 +176,7 @@ class SoundProcessor : BaseAudioProcessor() {
         val src = input.order(ByteOrder.nativeOrder())
         val frame = FloatArray(channels)
         val level = normalize
+        val beats = tracker
         while (src.remaining() >= channels * 2) {
             var power = 0f
             for (c in 0 until channels) {
@@ -247,13 +202,7 @@ class SoundProcessor : BaseAudioProcessor() {
                 mono += y
                 out.putShort((y * 32767f).toInt().toShort())
             }
-            mono /= channels
-            // Two gentle low-pass steps keep the bass (kick drum) for beat detection.
-            low1 += (mono - low1) * lowK
-            low2 += (low1 - low2) * lowK
-            hopE += mono * mono
-            hopB += low2 * low2
-            if (++hopCount == HOP) endHop()
+            beats?.push(mono / channels)
         }
         input.position(input.limit())
         out.flip()
@@ -262,19 +211,14 @@ class SoundProcessor : BaseAudioProcessor() {
     override fun onFlush() {
         bands.forEach { ch -> ch.forEach { it.reset() } }
         // A new stream (or a jump) starts counting from zero, like the player's position.
-        position = 0L
-        hopCount = 0
-        hopE = 0f
-        hopB = 0f
-        low1 = 0f
-        low2 = 0f
+        tracker?.reset()
+        epoch++
     }
 
     override fun onReset() {
         envelope = TARGET * TARGET
         gain = 1f
-        head = -1
-        longE = 0f; shortE = 0f; midE = 0f; midB = 0f; beat = 0f
+        tracker?.reset()
     }
 
     private fun rebuild() {
@@ -308,8 +252,6 @@ class SoundProcessor : BaseAudioProcessor() {
         const val SILENCE = 1e-5f // about -50 dBFS
         const val MIN_GAIN = 0.25f // -12 dB
         const val MAX_GAIN = 4f // +12 dB
-        const val HOP = 512 // about 11 ms
-        const val HISTORY = 512 // about 6 s
     }
 }
 

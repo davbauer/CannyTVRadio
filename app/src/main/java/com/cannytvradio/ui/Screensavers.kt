@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
@@ -68,6 +69,7 @@ import com.cannytvradio.data.DimStyle
 import com.cannytvradio.data.SaverBrightness
 import com.cannytvradio.data.SaverReact
 import com.cannytvradio.data.SaverVisual
+import com.cannytvradio.player.BeatTracker
 import com.cannytvradio.player.PlayerState
 import kotlinx.coroutines.delay
 import java.util.Date
@@ -105,6 +107,21 @@ private class SaverEnv(val light: Float, val react: Float) {
     /** 1 right on a beat, fading within a quarter second, scaled like [energy]. */
     var beat = 0f
 
+    /** Kick drum and bass line (0..1, quick), scaled like [energy]. */
+    var bass = 0f
+
+    /** Hi-hats and cymbals (0..1, quick), scaled like [energy]. */
+    var treble = 0f
+
+    /** Breathes with the tempo: 1 on each beat, 0 halfway between (0 while no steady beat is known), scaled like [energy]. */
+    var sway = 0f
+
+    /** Runs faster with the treble; makes fine detail shimmer with hi-hats. */
+    var shimmer = 0f
+
+    /** Extra look-ahead for visuals on their own surface, which reach the screen a frame later. */
+    var extraLeadMs = 0L
+
     /** Called once per frame after the values above are updated (the aurora hands them to its own surface). */
     var onFrame: (() -> Unit)? = null
 
@@ -124,7 +141,7 @@ private val LocalSaver = staticCompositionLocalOf { SaverEnv(1f, 0f) }
 internal fun visualLeadMs(fps: Int, refresh: Int): Long = 2000L / refresh.coerceAtLeast(1) + 500L / fps.coerceAtLeast(1)
 
 /**
- * [pulse] writes the music's energy and beat into a 2-element array, for the moment you hear
+ * [pulse] writes what the music does ([BeatTracker.read]) into an array, for the moment you hear
  * plus the given milliseconds. [revealed] turns true once the app underneath is hidden.
  */
 @Composable
@@ -138,13 +155,17 @@ fun Screensaver(
     pulse: (aheadMs: Long, out: FloatArray) -> Unit,
 ) {
     val env = remember(brightness, react) { SaverEnv(brightness.level, react.amount) }
+    // Always the newest, so a sync change applies while the screensaver runs.
+    val currentPulse by rememberUpdatedState(pulse)
     val view = LocalView.current
     remember { Pacer.begin(view.display?.refreshRate ?: 60f) }
+    // The aurora draws on its own surface; its frames reach the screen one refresh later.
+    env.extraLeadMs = if (visual == SaverVisual.Aurora) 1000L / Pacer.refresh else 0L
     val moving = visual != SaverVisual.None || content != DimStyle.Nothing
     if (moving) {
         MeasureFrames()
         LaunchedEffect(env) {
-            val raw = FloatArray(2)
+            val raw = FloatArray(BeatTracker.OUT_SIZE)
             var last = 0L
             var energy = 0f
             env.time.floatValue = Random.nextFloat() * 1000f
@@ -156,12 +177,17 @@ fun Screensaver(
                     val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.1f)
                     last = now
                     // Look ahead by the time a frame needs to reach the screen, so a beat lands when you hear it.
-                    if (env.react > 0f) pulse(visualLeadMs(rate, Pacer.refresh), raw) else raw.fill(0f)
-                    energy += (raw[0] - energy) * (1f - exp(-dt / 0.08f))
+                    if (env.react > 0f) currentPulse(visualLeadMs(rate, Pacer.refresh) + env.extraLeadMs, raw) else raw.fill(0f)
+                    energy += (raw[BeatTracker.OUT_ENERGY] - energy) * (1f - exp(-dt / 0.08f))
                     env.energy = energy * env.react
-                    env.beat = raw[1] * env.react
+                    env.beat = raw[BeatTracker.OUT_BEAT] * env.react
+                    env.bass = raw[BeatTracker.OUT_BASS] * env.react
+                    env.treble = raw[BeatTracker.OUT_TREBLE] * env.react
+                    val phase = raw[BeatTracker.OUT_PHASE]
+                    env.sway = if (phase < 0f) 0f else (0.5f + 0.5f * kotlin.math.cos(phase * TWO_PI)) * env.react
+                    env.shimmer += dt * (0.5f + 2f * env.treble)
                     env.dt = dt
-                    env.flow += dt * (1f + 1.5f * env.energy + 3f * env.beat)
+                    env.flow += dt * (1f + 1.3f * env.energy + 0.8f * env.bass + 3f * env.beat)
                     env.time.floatValue += dt
                     env.onFrame?.invoke()
                 }
@@ -450,6 +476,10 @@ private fun Aurora() {
                     renderer.flow = env.flow
                     renderer.energy = env.energy
                     renderer.beat = env.beat
+                    renderer.bass = env.bass
+                    renderer.treble = env.treble
+                    renderer.sway = env.sway
+                    renderer.shimmer = env.shimmer
                     renderer.light = env.light
                     view.requestRender()
                 }
@@ -464,6 +494,10 @@ private class AuroraRenderer : GLSurfaceView.Renderer {
     @Volatile var flow = 0f
     @Volatile var energy = 0f
     @Volatile var beat = 0f
+    @Volatile var bass = 0f
+    @Volatile var treble = 0f
+    @Volatile var sway = 0f
+    @Volatile var shimmer = 0f
     @Volatile var light = 1f
 
     private var program = 0
@@ -472,6 +506,10 @@ private class AuroraRenderer : GLSurfaceView.Renderer {
     private var uFlow = 0
     private var uEnergy = 0
     private var uBeat = 0
+    private var uBass = 0
+    private var uTreble = 0
+    private var uSway = 0
+    private var uShimmer = 0
     private var uLight = 0
     private var uFade = 0
     private var uNoise = 0
@@ -491,6 +529,10 @@ private class AuroraRenderer : GLSurfaceView.Renderer {
         uFlow = GLES20.glGetUniformLocation(program, "uFlow")
         uEnergy = GLES20.glGetUniformLocation(program, "uEnergy")
         uBeat = GLES20.glGetUniformLocation(program, "uBeat")
+        uBass = GLES20.glGetUniformLocation(program, "uBass")
+        uTreble = GLES20.glGetUniformLocation(program, "uTreble")
+        uSway = GLES20.glGetUniformLocation(program, "uSway")
+        uShimmer = GLES20.glGetUniformLocation(program, "uShimmer")
         uLight = GLES20.glGetUniformLocation(program, "uLight")
         uFade = GLES20.glGetUniformLocation(program, "uFade")
         uNoise = GLES20.glGetUniformLocation(program, "uNoise")
@@ -556,6 +598,10 @@ private class AuroraRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(uFlow, flow % 2000f)
         GLES20.glUniform1f(uEnergy, energy)
         GLES20.glUniform1f(uBeat, beat)
+        GLES20.glUniform1f(uBass, bass)
+        GLES20.glUniform1f(uTreble, treble)
+        GLES20.glUniform1f(uSway, sway)
+        GLES20.glUniform1f(uShimmer, shimmer % 2000f)
         GLES20.glUniform1f(uLight, light)
         // Fades in over two seconds once the app underneath is gone.
         GLES20.glUniform1f(uFade, ((now - start) / 2f).coerceIn(0f, 1f))
@@ -607,6 +653,10 @@ uniform vec2 uRes;
 uniform float uFlow;
 uniform float uEnergy;
 uniform float uBeat;
+uniform float uBass;
+uniform float uTreble;
+uniform float uSway;
+uniform float uShimmer;
 uniform float uLight;
 uniform float uFade;
 uniform sampler2D uNoise;
@@ -624,18 +674,19 @@ vec3 curtain(vec2 uv, float base, float tall, float speed, float seed, float bri
         + 0.030 * sin(x * 10.3 - t * 0.33 + seed * 2.0)
         + 0.060 * (n(vec2(x * 3.0 + t * 0.06, seed * 5.0)) - 0.5);
     float h = uv.y - edge;
-    float height = tall * (0.7 + 0.3 * sin(x * 3.3 - t * 0.15 + seed)) * (1.0 + 0.25 * uEnergy + 0.3 * uBeat);
+    float height = tall * (0.7 + 0.3 * sin(x * 3.3 - t * 0.15 + seed)) * (1.0 + 0.2 * uEnergy + 0.3 * uBass + 0.35 * uBeat);
     // Far from the curtain there is nothing to compute.
     if (h < -0.03 || h > height * 2.6) return vec3(0.0);
     float lowerEdge = smoothstep(-0.025, 0.004, h);
     float fall = exp(-max(h, 0.0) / height * 2.4);
     float rays = n(vec2(x * 55.0 + seed * 7.0 + t * 0.22, h * 1.2 - t * 0.08 + seed * 11.0));
-    float fine = n(vec2(x * 120.0 - t * 0.45, h * 2.0 + seed * 13.0));
-    float r = rays * rays * (0.6 + 0.4 * fine) * 1.6;
+    // Fine rays shimmer faster and stronger with hi-hats and cymbals.
+    float fine = n(vec2(x * 120.0 - uShimmer * 0.9, h * 2.0 + seed * 13.0));
+    float r = rays * rays * (0.6 + (0.4 + 0.4 * uTreble) * fine) * 1.6;
     // Bright stretches with dark gaps in between, drifting along the curtain.
     float patch = smoothstep(0.32, 0.78, n(vec2(x * 2.4 + t * 0.045 + seed * 3.0, seed * 9.0)));
     float wave = 1.0 + 0.9 * uBeat * (0.5 + 0.5 * sin(x * 9.0 - uFlow * 4.0));
-    float k = lowerEdge * fall * r * patch * wave * bright * (1.0 + 0.35 * uEnergy + 0.6 * uBeat);
+    float k = lowerEdge * fall * r * patch * wave * bright * (1.0 + 0.3 * uEnergy + 0.25 * uBass + 1.0 * uBeat + 0.2 * uSway);
     vec3 col = mix(low, high, smoothstep(0.0, height * 1.2, h));
     // A thin pink fringe at the lower edge on strong beats, like a bright real aurora.
     col = mix(col, vec3(0.95, 0.35, 0.65), 0.3 * uBeat * (1.0 - smoothstep(0.0, 0.02, abs(h))));
@@ -701,7 +752,8 @@ private fun Starfield() {
             }
             ready[0] = true
         }
-        val speed = 0.07f * (1f + 2.5f * env.energy + 7f * env.beat)
+        // Flight speed: energy and bass push, beats surge, and it breathes a little with the tempo.
+        val speed = 0.07f * (1f + 2f * env.energy + 1.2f * env.bass + 6f * env.beat + 0.5f * env.sway)
         val dz = env.dt * speed
         // The streak shows where the star was a moment ago: a dot when calm, a line when fast.
         val tail = speed * 0.09f
@@ -730,13 +782,15 @@ private fun Starfield() {
             counts[g]++
         }
         val unit = 1.dp.toPx()
-        val flash = 1f + 0.6f * env.beat
+        val flash = 1f + 0.5f * env.beat + 0.15f * env.bass
         drawIntoCanvas { canvas ->
             for (g in 0 until STAR_GROUPS) {
                 if (counts[g] == 0) continue
                 val near = (g + 0.5f) / STAR_GROUPS
                 paint.strokeWidth = unit * (1.1f + 3f * near)
-                paint.alpha = (255 * env.a((0.14f + 0.5f * near) * flash)).toInt()
+                // Far stars twinkle with hi-hats and cymbals, near ones flash with the beat.
+                val twinkle = 1f + 0.6f * env.treble * (1f - near)
+                paint.alpha = (255 * env.a((0.14f + 0.5f * near) * flash * twinkle)).toInt()
                 canvas.nativeCanvas.drawLines(lines[g], 0, counts[g] * 4, paint)
             }
         }

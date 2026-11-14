@@ -114,6 +114,7 @@ class PlayerController(
             )
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        sound.follow(player)
 
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val onNetwork = object : ConnectivityManager.NetworkCallback() {

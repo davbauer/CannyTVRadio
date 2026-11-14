@@ -175,4 +175,6 @@
     <string name="sync_listening">Hört auf den Takt …</string>
     <string name="sync_found">Schläge erkannt: %1$d von %2$d · auf ±%3$d ms genau</string>
     <string name="sync_keys">OK speichert · Zurück bricht ab</string>
+    <string name="sync_view_hint">Hoch oder runter: Sternenflug und Polarlicht zum Klopfen testen</string>
+    <string name="sync_view_back">Links und rechts verschieben · Hoch oder runter: nächste Ansicht</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -18,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cannytvradio.R
 import com.cannytvradio.RadioApp
+import com.cannytvradio.data.SaverReact
+import com.cannytvradio.data.SaverVisual
+import com.cannytvradio.player.BeatTracker
 import com.cannytvradio.player.SYNC_BEAT_MS
 import com.cannytvradio.player.SYNC_FIRST_BEAT_MS
 import com.cannytvradio.player.SoundProcessor
@@ -57,6 +62,9 @@ internal const val SYNC_RANGE = 400
 
 /** "0 ms", "+40 ms", "-30 ms". */
 internal fun syncText(ms: Int) = if (ms == 0) "0 ms" else "%+d ms".format(ms)
+
+/** The backgrounds the helper can show with the knocks, after the circle. */
+private val PREVIEW_VISUALS = listOf(SaverVisual.Starfield, SaverVisual.Aurora)
 
 /** Last beat of the click track; after it the track starts over. */
 private const val SYNC_LAST_BEAT_MS = 29_500L
@@ -77,9 +85,17 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
     val sound = remember { SoundProcessor().apply { normalize = false } }
     val player = remember { syncPlayer(context, sound) }
     val radioWasPlaying = remember { app.player.player.isPlaying }
+    val ui = LocalUi.current
+    val ps by app.player.state.collectAsState()
+    // Up and down go through the views: the circle, then each background with the knocks.
+    var screen by remember { mutableIntStateOf(0) }
+    val previewVisual = PREVIEW_VISUALS.getOrNull(screen - 1)
+    val preview = previewVisual != null
+    LaunchedEffect(preview) { ui.syncPreview = preview }
     DisposableEffect(Unit) {
         if (radioWasPlaying) app.player.pause()
         onDispose {
+            ui.syncPreview = false
             player.release()
             if (radioWasPlaying) app.player.resume()
         }
@@ -94,7 +110,7 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
     var lag by remember { mutableIntStateOf(start.saverDetectMs) }
 
     LaunchedEffect(Unit) {
-        val out = FloatArray(2)
+        val out = FloatArray(BeatTracker.OUT_SIZE)
         var seen = sound.onsetTotal
         var nextBeat = 0
         var lastPos = 0L
@@ -106,13 +122,14 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
                 if (!player.isPlaying) return@withFrameNanos
                 // Exactly the screensaver's formula, so the value set here holds there too.
                 sound.pulse(pos + visualLeadMs(refresh, refresh) + lag - offset, out)
-                flash.floatValue = out[1]
+                flash.floatValue = out[BeatTracker.OUT_BEAT]
                 // Knocks that have passed (with a little time for the detection to report them).
                 while (SYNC_FIRST_BEAT_MS + nextBeat * SYNC_BEAT_MS <= minOf(pos - 200, SYNC_LAST_BEAT_MS)) {
                     nextBeat++
                     expected++
                 }
                 val rate = sound.sampleRate
+                if (seen > sound.onsetTotal) seen = sound.onsetTotal
                 while (rate > 0 && seen < sound.onsetTotal) {
                     val ms = sound.onset(seen++) * 1000 / rate
                     val beat = ((ms - SYNC_FIRST_BEAT_MS).toDouble() / SYNC_BEAT_MS).roundToLong()
@@ -144,7 +161,7 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .then(if (preview) Modifier else Modifier.background(Color.Black))
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
@@ -152,6 +169,8 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
                 when (e.key) {
                     Key.DirectionLeft -> { offset = (offset - 10).coerceAtLeast(-SYNC_RANGE); true }
                     Key.DirectionRight -> { offset = (offset + 10).coerceAtMost(SYNC_RANGE); true }
+                    Key.DirectionDown -> { screen = (screen + 1) % (PREVIEW_VISUALS.size + 1); true }
+                    Key.DirectionUp -> { screen = (screen + PREVIEW_VISUALS.size) % (PREVIEW_VISUALS.size + 1); true }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { save(); true }
                     Key.Back, Key.Escape -> { onClose(); true }
                     else -> true
@@ -159,6 +178,33 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
             },
         contentAlignment = Alignment.Center,
     ) {
+        if (previewVisual != null) {
+            // The real screensaver with your settings, moved by the knocks: what you set here is what you get.
+            val prefs = app.settings.prefs.value
+            Screensaver(
+                prefs.dimStyle,
+                previewVisual,
+                prefs.saverBrightness,
+                if (prefs.saverReact == SaverReact.Off) SaverReact.Medium else prefs.saverReact,
+                ps,
+                revealed = true,
+            ) { ahead, out ->
+                if (player.isPlaying) sound.pulse(player.currentPosition + ahead + lag - offset, out) else out.fill(0f)
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            ) {
+                Text(
+                    stringResource(if (previewVisual == SaverVisual.Aurora) R.string.style_aurora else R.string.style_starfield),
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 16.sp,
+                )
+                Text("‹  ${syncText(offset)}  ›", color = Color.White.copy(alpha = 0.7f), fontSize = 26.sp, style = TextStyle(fontFeatureSettings = "tnum"))
+                Text(stringResource(R.string.sync_view_back), color = Color.White.copy(alpha = 0.4f), fontSize = 14.sp)
+            }
+            return@Box
+        }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 760.dp)) {
             Text(stringResource(R.string.s_sync), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
@@ -210,6 +256,7 @@ fun SyncHelper(app: RadioApp, onClose: () -> Unit) {
             )
             Spacer(Modifier.height(10.dp))
             Text(stringResource(R.string.sync_keys), color = Color.White.copy(alpha = 0.4f), fontSize = 15.sp)
+            Text(stringResource(R.string.sync_view_hint), color = Color.White.copy(alpha = 0.4f), fontSize = 15.sp)
         }
     }
 }

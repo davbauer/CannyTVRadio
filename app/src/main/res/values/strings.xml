@@ -179,4 +179,6 @@
     <string name="sync_listening">Listening for the beat …</string>
     <string name="sync_found">Beats found: %1$d of %2$d · within ±%3$d ms</string>
     <string name="sync_keys">OK saves · Back cancels</string>
+    <string name="sync_view_hint">Up or down: test the starfield and northern lights with the knocks</string>
+    <string name="sync_view_back">Left and right shift · Up or down: next view</string>
 </resources>

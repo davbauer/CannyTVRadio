@@ -29,6 +29,7 @@ fun syncPlayer(context: Context, sound: SoundProcessor): ExoPlayer {
     val player = ExoPlayer.Builder(context, renderers)
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
         .build()
+    sound.follow(player)
     player.addListener(object : Player.Listener {
         override fun onPlaybackStateChanged(state: Int) {
             // Start over from the beginning, so positions and beat times stay in step.
