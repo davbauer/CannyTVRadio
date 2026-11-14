@@ -145,4 +145,6 @@
     <string name="update_err_signature">The file isn\'t signed with the CannyTVRadio key. Nothing was installed.</string>
     <string name="update_err_installer">No installer found on this device (%1$s).</string>
     <string name="update_err_other">Unexpected error: %1$s</string>
+    <string name="update_versions">Installed: %1$s · New: %2$s</string>
+    <string name="update_installed">Installed: %1$s</string>
 </resources>

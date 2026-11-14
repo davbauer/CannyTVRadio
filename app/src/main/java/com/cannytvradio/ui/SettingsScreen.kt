@@ -102,6 +102,12 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                 Group {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
                         Text(stringResource(R.string.update_available, info.versionName), color = Glass.text, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.update_versions, BuildConfig.VERSION_NAME, info.versionName),
+                            color = Glass.textFaint,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
                         info.changes.take(6).forEach { change ->
                             Text("•  $change", color = Glass.textDim, style = MaterialTheme.typography.bodyMedium)
                         }
@@ -239,13 +245,18 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                 ) { if (!testing) checks++ }
                 Action(
                     stringResource(R.string.s_updates),
-                    when {
-                        updateState.checking -> stringResource(R.string.checking)
-                        updateState.available != null -> stringResource(R.string.update_available, updateState.available!!.versionName)
-                        updateState.lastCheckOk == true -> stringResource(R.string.update_current)
-                        updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed) + " " + updateErrorText(updateState.error)
-                        else -> null
-                    },
+                    // Always the installed version first, then what the last check found.
+                    listOfNotNull(
+                        updateState.available?.let { stringResource(R.string.update_versions, BuildConfig.VERSION_NAME, it.versionName) }
+                            ?: stringResource(R.string.update_installed, BuildConfig.VERSION_NAME),
+                        when {
+                            updateState.checking -> stringResource(R.string.checking)
+                            updateState.available != null -> null
+                            updateState.lastCheckOk == true -> stringResource(R.string.update_current)
+                            updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed) + " " + updateErrorText(updateState.error)
+                            else -> null
+                        },
+                    ).joinToString(" · "),
                     stringResource(R.string.s_check_updates),
                 ) { app.updater.check(force = true) }
                 Action(stringResource(R.string.s_clear_cache), null, "") {

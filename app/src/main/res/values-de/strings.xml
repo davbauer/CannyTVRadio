@@ -141,4 +141,6 @@
     <string name="update_err_signature">Die Datei ist nicht mit dem CannyTVRadio-Schlüssel signiert. Es wurde nichts installiert.</string>
     <string name="update_err_installer">Auf diesem Gerät wurde kein Installer gefunden (%1$s).</string>
     <string name="update_err_other">Unerwarteter Fehler: %1$s</string>
+    <string name="update_versions">Installiert: %1$s · Neu: %2$s</string>
+    <string name="update_installed">Installiert: %1$s</string>
 </resources>
