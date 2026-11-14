@@ -147,4 +147,5 @@
     <string name="update_err_other">Unexpected error: %1$s</string>
     <string name="update_versions">Installed: %1$s · New: %2$s</string>
     <string name="update_installed">Installed: %1$s</string>
+    <string name="s_install_now">Install</string>
 </resources>

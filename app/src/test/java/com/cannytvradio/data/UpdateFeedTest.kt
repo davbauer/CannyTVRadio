@@ -66,6 +66,23 @@ class UpdateFeedTest {
         )
     }
 
+    @Test fun findsUpdateJsonInTheReleaseApiAnswer() {
+        val release = org.json.JSONObject(
+            """{"tag_name": "v1.3", "assets": [
+                {"name": "CannyTVRadio.apk", "browser_download_url": "https://github.com/davbauer/CannyTVRadio/releases/download/v1.3/CannyTVRadio.apk"},
+                {"name": "update.json", "browser_download_url": "https://github.com/davbauer/CannyTVRadio/releases/download/v1.3/update.json"}]}""",
+        )
+        assertEquals("https://github.com/davbauer/CannyTVRadio/releases/download/v1.3/update.json", UpdateFeed.feedUrlFromRelease(release))
+    }
+
+    @Test fun ignoresForeignUpdateJson() {
+        val release = org.json.JSONObject(
+            """{"assets": [{"name": "update.json", "browser_download_url": "https://evil.example.com/update.json"}]}""",
+        )
+        assertNull(UpdateFeed.feedUrlFromRelease(release))
+        assertNull(UpdateFeed.feedUrlFromRelease(org.json.JSONObject("""{"message": "API rate limit exceeded"}""")))
+    }
+
     @Test fun brokenFeedIsNotAnUpdate() {
         assertNull(UpdateFeed.parse("""{"versionCode": 4}""", 34, emptyList(), "en"))
     }

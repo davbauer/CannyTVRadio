@@ -143,4 +143,5 @@
     <string name="update_err_other">Unerwarteter Fehler: %1$s</string>
     <string name="update_versions">Installiert: %1$s · Neu: %2$s</string>
     <string name="update_installed">Installiert: %1$s</string>
+    <string name="s_install_now">Installieren</string>
 </resources>

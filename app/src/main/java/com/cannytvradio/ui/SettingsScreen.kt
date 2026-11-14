@@ -97,8 +97,8 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
     ) {
         val update = updateState
         update.available?.let { info ->
-            item { Section(stringResource(R.string.s_section_update)) }
-            item {
+            item("update-title") { Section(stringResource(R.string.s_section_update)) }
+            item("update") {
                 Group {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
                         Text(stringResource(R.string.update_available, info.versionName), color = Glass.text, style = MaterialTheme.typography.titleMedium)
@@ -112,14 +112,7 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                             Text("•  $change", color = Glass.textDim, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    val status = when (update.step) {
-                        UpdateState.Step.Downloading -> stringResource(R.string.update_downloading, (update.progress * 100).toInt())
-                        UpdateState.Step.Verifying -> stringResource(R.string.update_verifying)
-                        UpdateState.Step.NeedsPermission -> stringResource(R.string.update_allow)
-                        UpdateState.Step.Installing -> stringResource(R.string.update_installing)
-                        UpdateState.Step.Failed -> updateErrorText(update.error)
-                        UpdateState.Step.Idle -> null
-                    }
+                    val status = updateStepText(update)
                     Action(stringResource(R.string.update_install), status, "") {
                         (context as? android.app.Activity)?.let(app.updater::install)
                     }
@@ -127,8 +120,8 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
             }
         }
 
-        item { Section(stringResource(R.string.s_section_screen)) }
-        item {
+        item("screen-title") { Section(stringResource(R.string.s_section_screen)) }
+        item("screen") {
             Group {
                 Toggle(stringResource(R.string.s_dim_enabled), stringResource(R.string.s_dim_enabled_desc), prefs.dimEnabled) {
                     update { it.copy(dimEnabled = !it.dimEnabled) }
@@ -154,8 +147,8 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
             }
         }
 
-        item { Section(stringResource(R.string.s_section_sound)) }
-        item {
+        item("sound-title") { Section(stringResource(R.string.s_section_sound)) }
+        item("sound") {
             Group {
                 Toggle(stringResource(R.string.s_normalize), stringResource(R.string.s_normalize_desc), prefs.normalize) {
                     update { it.copy(normalize = !it.normalize) }
@@ -182,8 +175,8 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
             }
         }
 
-        item { Section(stringResource(R.string.s_section_play)) }
-        item {
+        item("play-title") { Section(stringResource(R.string.s_section_play)) }
+        item("play") {
             Group {
                 Toggle(stringResource(R.string.s_resume), null, prefs.resumeOnStart) {
                     update { it.copy(resumeOnStart = !it.resumeOnStart) }
@@ -205,8 +198,8 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
             }
         }
 
-        item { Section(stringResource(R.string.s_section_general)) }
-        item {
+        item("general-title") { Section(stringResource(R.string.s_section_general)) }
+        item("general") {
             Group {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val lang = appLanguage(context)
@@ -256,16 +249,20 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                             updateState.lastCheckOk == false -> stringResource(R.string.update_check_failed) + " " + updateErrorText(updateState.error)
                             else -> null
                         },
-                    ).joinToString(" · "),
-                    stringResource(R.string.s_check_updates),
-                ) { app.updater.check(force = true) }
+                    ).joinToString(" · ") + (updateStepText(updateState)?.let { "\n$it" } ?: ""),
+                    stringResource(if (updateState.available != null) R.string.s_install_now else R.string.s_check_updates),
+                ) {
+                    // Found something: install right here, no need to go looking for it at the top.
+                    if (updateState.available != null) (context as? android.app.Activity)?.let(app.updater::install)
+                    else app.updater.check(force = true)
+                }
                 Action(stringResource(R.string.s_clear_cache), null, "") {
                     app.repo.clearCache()
                     actions.toast(context.getString(R.string.cache_cleared))
                 }
             }
         }
-        item {
+        item("version") {
             Text(
                 stringResource(R.string.app_name) + " · " + stringResource(R.string.s_version, BuildConfig.VERSION_NAME),
                 color = Glass.textFaint,
@@ -274,6 +271,17 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
             )
         }
     }
+}
+
+/** Where an update install stands: progress, the next step for the user, or what went wrong. */
+@Composable
+private fun updateStepText(update: UpdateState): String? = when (update.step) {
+    UpdateState.Step.Downloading -> stringResource(R.string.update_downloading, (update.progress * 100).toInt())
+    UpdateState.Step.Verifying -> stringResource(R.string.update_verifying)
+    UpdateState.Step.NeedsPermission -> stringResource(R.string.update_allow)
+    UpdateState.Step.Installing -> stringResource(R.string.update_installing)
+    UpdateState.Step.Failed -> updateErrorText(update.error)
+    UpdateState.Step.Idle -> null
 }
 
 /** The exact reason an update check or install failed, with technical detail where useful. */

@@ -73,7 +73,13 @@ class Updater(private val context: Context, private val http: Http, private val 
         scope.launch {
             val info = try {
                 val language = if (java.util.Locale.getDefault().language == "de") "de" else "en"
-                UpdateFeed.parse(http.get(FEED), Build.VERSION.SDK_INT, Build.SUPPORTED_ABIS.toList(), language)
+                val (body, source) = fetchFeed()
+                UpdateFeed.parse(body, Build.VERSION.SDK_INT, Build.SUPPORTED_ABIS.toList(), language).also {
+                    android.util.Log.i(
+                        "CannyTVRadio",
+                        "update: feed ${it?.versionName} (${it?.versionCode}) via $source, installed ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -135,6 +141,27 @@ class Updater(private val context: Context, private val http: Http, private val 
                 _state.update { s -> s.copy(step = UpdateState.Step.Failed, error = UpdateError(UpdateError.Kind.NoInstaller, e.javaClass.simpleName)) }
             }
         }
+    }
+
+    /**
+     * Finds the newest update.json. GitHub's API says which release is latest right away (cached
+     * for at most a minute), and that release's own update.json can't be stale. The "latest"
+     * download link updates minutes later on GitHub's content network, so it's only the fallback
+     * (for when the API's hourly limit is used up), asked with cache-busting.
+     */
+    private suspend fun fetchFeed(): Pair<String, String> {
+        val noCache = mapOf("Cache-Control" to "no-cache", "Pragma" to "no-cache")
+        val viaApi = try {
+            val release = JSONObject(http.get(UpdateFeed.LATEST_API, noCache + ("Accept" to "application/vnd.github+json")))
+            UpdateFeed.feedUrlFromRelease(release)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("CannyTVRadio", "update: release API unavailable ($e), using the latest link")
+            null
+        }
+        return if (viaApi != null) http.get(viaApi, noCache) to "api"
+        else http.get("$FEED?nocache=${System.currentTimeMillis()}", noCache) to "latest link"
     }
 
     /** Looks for updates 1 minute after start, then every 4 hours, so startup stays quick. */
@@ -230,6 +257,16 @@ object UpdateFeed {
     const val REPO = "https://github.com/davbauer/CannyTVRadio"
     /** Downloads are only trusted from this project's own GitHub releases. */
     const val TRUSTED_PREFIX = "$REPO/releases/download/"
+    const val LATEST_API = "https://api.github.com/repos/davbauer/CannyTVRadio/releases/latest"
+
+    /** The update.json of a release from GitHub's API answer, if it is one of ours. */
+    fun feedUrlFromRelease(release: JSONObject): String? {
+        val assets = release.optJSONArray("assets") ?: return null
+        return (0 until assets.length()).map { assets.getJSONObject(it) }
+            .firstOrNull { it.optString("name") == "update.json" }
+            ?.optString("browser_download_url")
+            ?.takeIf { isTrusted(it) && it.endsWith("/update.json") }
+    }
 
     /** The download that fits this device, or null if none fits or none is trusted. */
     fun parse(body: String, sdkInt: Int, abis: List<String>, language: String): UpdateInfo? {

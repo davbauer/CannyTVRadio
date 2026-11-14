@@ -30,8 +30,9 @@ class Http(context: Context) {
 
     private val dir = File(context.filesDir, "responses").apply { mkdirs() }
 
-    suspend fun get(url: String): String = withContext(Dispatchers.IO) {
-        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
+    suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
+        client.newCall(request).execute().use { r ->
             if (!r.isSuccessful) throw IOException("HTTP ${r.code} for $url")
             r.body?.string() ?: throw IOException("Empty body for $url")
         }

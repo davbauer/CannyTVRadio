@@ -1,0 +1,12 @@
+{
+  "en": [
+    "Finds a new version right after it's published",
+    "Focus stays where it is when an update is found",
+    "Install an update right from the Updates row"
+  ],
+  "de": [
+    "Findet eine neue Version direkt nach der Veröffentlichung",
+    "Der Fokus bleibt, wo er ist, wenn ein Update gefunden wird",
+    "Updates direkt in der Zeile „Updates“ installieren"
+  ]
+}
