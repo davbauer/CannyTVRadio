@@ -61,8 +61,6 @@
     <string name="s_section_screen">Bildschirm</string>
     <string name="s_dim_after">Dunkel nach</string>
     <string name="s_dim_style">Dunkler Bildschirm zeigt</string>
-    <string name="style_clock">Uhr und Titel</string>
-    <string name="style_black">Nichts</string>
     <string name="s_section_play">Wiedergabe</string>
     <string name="s_resume">Beim Start letzten Sender spielen</string>
     <string name="s_order">Bei mehreren Streams</string>
@@ -122,4 +120,7 @@
     <string name="eq_custom">Eigenes %1$d</string>
     <string name="s_eq_edit_desc">OK auf einem Band nimmt es auf, hoch und runter verändern es, OK lässt los.</string>
     <string name="s_eq_reset">Auf neutral zurücksetzen</string>
+    <string name="style_time">Uhrzeit</string>
+    <string name="style_time_info">Uhrzeit und Infos</string>
+    <string name="style_nothing">Nichts</string>
 </resources>

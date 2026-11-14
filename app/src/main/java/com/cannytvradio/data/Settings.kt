@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class DimAfter(val seconds: Int) { S10(10), S30(30), M1(60), M5(300) }
 
-enum class DimStyle { Clock, Black }
+/** What the dark screen shows. */
+enum class DimStyle { Time, TimeAndInfo, Nothing }
 
 enum class StreamOrder { Quality, Reliable }
 
@@ -17,7 +18,7 @@ data class Prefs(
     /** Screen goes dark by itself after [dimAfter] without input; the moon in the bar toggles it. */
     val dimEnabled: Boolean = true,
     val dimAfter: DimAfter = DimAfter.S10,
-    val dimStyle: DimStyle = DimStyle.Clock,
+    val dimStyle: DimStyle = DimStyle.TimeAndInfo,
     val resumeOnStart: Boolean = true,
     val streamOrder: StreamOrder = StreamOrder.Quality,
     /** Bring every station to the same loudness. */
@@ -58,7 +59,12 @@ class Settings(private val sp: SharedPreferences) {
     private fun load() = Prefs(
         dimEnabled = sp.getBoolean("dimEnabled", sp.getString("dimAfter", null) != "Off"),
         dimAfter = enumOr(sp.getString("dimAfter", null), DimAfter.S10),
-        dimStyle = enumOr(sp.getString("dimStyle", null), DimStyle.Clock),
+        // Older versions stored "Clock" and "Black".
+        dimStyle = when (val v = sp.getString("dimStyle", null)) {
+            "Clock" -> DimStyle.TimeAndInfo
+            "Black" -> DimStyle.Nothing
+            else -> enumOr(v, DimStyle.TimeAndInfo)
+        },
         resumeOnStart = sp.getBoolean("resumeOnStart", true),
         streamOrder = enumOr(sp.getString("streamOrder", null), StreamOrder.Quality),
         normalize = sp.getBoolean("normalize", true),

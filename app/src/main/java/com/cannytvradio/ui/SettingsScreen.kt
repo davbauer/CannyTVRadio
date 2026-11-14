@@ -107,7 +107,13 @@ fun SettingsScreen(app: RadioApp, actions: Actions) {
                 Choice(
                     stringResource(R.string.s_dim_style),
                     null,
-                    stringResource(if (prefs.dimStyle == DimStyle.Clock) R.string.style_clock else R.string.style_black),
+                    stringResource(
+                        when (prefs.dimStyle) {
+                            DimStyle.Time -> R.string.style_time
+                            DimStyle.TimeAndInfo -> R.string.style_time_info
+                            DimStyle.Nothing -> R.string.style_nothing
+                        },
+                    ),
                     onStep = { by -> update { it.copy(dimStyle = it.dimStyle.step(by)) } },
                 )
             }

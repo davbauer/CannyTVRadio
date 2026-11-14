@@ -63,8 +63,6 @@
     <string name="s_section_screen">Screen</string>
     <string name="s_dim_after">Go dark after</string>
     <string name="s_dim_style">Dark screen shows</string>
-    <string name="style_clock">Clock and song</string>
-    <string name="style_black">Nothing</string>
     <string name="s_section_play">Playback</string>
     <string name="s_resume">Resume last station on start</string>
     <string name="s_order">When a station has several streams</string>
@@ -126,4 +124,7 @@
     <string name="eq_custom">Custom %1$d</string>
     <string name="s_eq_edit_desc">OK on a band picks it up, up and down change it, OK lets go.</string>
     <string name="s_eq_reset">Reset to neutral</string>
+    <string name="style_time">Time</string>
+    <string name="style_time_info">Time and info</string>
+    <string name="style_nothing">Nothing</string>
 </resources>

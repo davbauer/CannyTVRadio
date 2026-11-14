@@ -579,19 +579,21 @@ private fun Toast(ui: Ui, modifier: Modifier) {
 /**
  * The dark screen, made for OLED and Mini-LED panels: black everywhere, the backlight at its lowest.
  *
- * Clock and title never stand still: they glide on a slow, never-repeating path (two sine waves with
- * periods of 13 and 17 minutes) across half the screen, a few pixels per second. The text is one
- * finished image that is moved with sub-pixel precision every frame, so the motion is perfectly
- * smooth and costs almost nothing. Any key brings the app back.
+ * The text block has a fixed width (long titles end in "…", digits all have the same width),
+ * so nothing in it shifts when the time, station or song changes. It is rendered once into its
+ * own image and only that image glides, on a slow path that never repeats (two sine waves with
+ * periods of 13 and 17 minutes), with sub-pixel smoothing: no snapping to the pixel grid, no
+ * flicker, and no pixel stays lit in one place. Any key brings the app back.
  */
 @Composable
 private fun Ambient(visible: Boolean, style: DimStyle, ps: PlayerState) {
     AnimatedVisibility(visible, enter = fadeIn(tween(1500)), exit = fadeOut(tween(200))) {
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            if (style == DimStyle.Clock) {
+            if (style != DimStyle.Nothing) {
                 val context = LocalContext.current
-                val reachX = constraints.maxWidth * 0.26f
-                val reachY = constraints.maxHeight * 0.24f
+                val block = maxWidth * 0.5f
+                val reachX = (constraints.maxWidth - with(androidx.compose.ui.platform.LocalDensity.current) { block.toPx() }) / 2f * 0.9f
+                val reachY = constraints.maxHeight * 0.26f
                 // Start somewhere different each time, so repeated dark screens don't share a spot.
                 val seconds = remember { mutableFloatStateOf(Random.nextFloat() * 10_000f) }
                 var time by remember { mutableStateOf(DateFormat.getTimeFormat(context).format(Date())) }
@@ -614,25 +616,75 @@ private fun Ambient(visible: Boolean, style: DimStyle, ps: PlayerState) {
                     }
                 }
                 Column(
-                    Modifier.graphicsLayer {
-                        val t = seconds.floatValue
-                        translationX = reachX * sin(t * TWO_PI / 780f)
-                        translationY = reachY * sin(t * TWO_PI / 1020f + 1.3f)
-                    },
+                    Modifier
+                        .width(block)
+                        .graphicsLayer {
+                            // A finished image moved with filtering glides smoothly between pixels.
+                            compositingStrategy = CompositingStrategy.Offscreen
+                            val t = seconds.floatValue
+                            translationX = reachX * sin(t * TWO_PI / 780f)
+                            translationY = reachY * sin(t * TWO_PI / 1020f + 1.3f)
+                        },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(time, color = Color.White.copy(alpha = 0.45f), fontSize = 112.sp, fontWeight = FontWeight.ExtraLight)
-                    ps.station?.let {
-                        Text(it.name, color = Color.White.copy(alpha = 0.34f), fontSize = 22.sp, fontWeight = FontWeight.Medium)
+                    CalmChange(time) { t ->
+                        Text(
+                            t,
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontSize = 112.sp,
+                            fontWeight = FontWeight.ExtraLight,
+                            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+                            maxLines = 1,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
-                    if (ps.song.isNotBlank()) {
+                    if (style == DimStyle.TimeAndInfo) {
+                        val info = Modifier.fillMaxWidth()
+                        CalmChange(ps.station?.name.orEmpty()) { name ->
+                        Text(
+                            name,
+                            color = Color.White.copy(alpha = 0.34f),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = info,
+                        )
+                        }
                         Spacer(Modifier.height(4.dp))
-                        Text(ps.song, color = Color.White.copy(alpha = 0.26f), fontSize = 18.sp, maxLines = 1)
+                        CalmChange(ps.song) { song ->
+                        Text(
+                            song,
+                            color = Color.White.copy(alpha = 0.26f),
+                            fontSize = 18.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = info,
+                        )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/** New text fades in with a slight rise while the old one fades out; slow enough to feel calm. */
+@Composable
+private fun CalmChange(value: String, content: @Composable (String) -> Unit) {
+    AnimatedContent(
+        targetState = value,
+        transitionSpec = {
+            (fadeIn(tween(900, delayMillis = 200)) + slideInVertically(tween(1100)) { it / 6 }) togetherWith
+                fadeOut(tween(700))
+        },
+        contentAlignment = Alignment.Center,
+        label = "calm",
+        modifier = Modifier.fillMaxWidth(),
+    ) { content(it) }
 }
 
 private const val TWO_PI = (2 * Math.PI).toFloat()
